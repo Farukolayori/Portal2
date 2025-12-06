@@ -1733,3 +1733,269 @@ body {
     border: 1px solid #ddd;
   }
 }
+/* Add this to your CSS file - Password Toggle Styling */
+.password-group {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--gray);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.5rem;
+  transition: var(--transition);
+  z-index: 3;
+}
+
+.toggle-password:hover {
+  color: var(--primary);
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Update form-group padding for password input */
+.password-group input {
+  padding-right: 3.5rem !important; /* Make room for the eye icon */
+}
+
+/* Fix File Upload Styling */
+.file-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.file-label {
+  flex: 1;
+  padding: 1rem 1rem 1rem 3.25rem;
+  border: 2px dashed var(--gray-light);
+  border-radius: var(--border-radius-sm);
+  background: white;
+  color: var(--gray);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: var(--transition);
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  min-height: 54px;
+}
+
+.dark-mode .file-label {
+  background: var(--dark-card);
+  border-color: var(--gray);
+}
+
+.file-label:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.file-label::before {
+  content: '\f03e';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary);
+  font-size: 1.1rem;
+  z-index: 2;
+}
+
+.file-group input[type="file"] {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+/* Add a camera icon alternative */
+.file-label.has-file::before {
+  content: '\f030'; /* camera icon */
+  color: var(--success);
+}
+
+/* Optional: Add an upload icon animation */
+.file-label.uploading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(67, 97, 238, 0.1), transparent);
+  animation: shimmer 2s infinite;
+}
+
+/* Add styles for the image preview container */
+.image-preview {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 1rem auto;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.5s ease;
+  border: 4px solid white;
+  transition: var(--transition);
+}
+
+.image-preview:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-xl);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-image {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  transition: var(--transition);
+  box-shadow: var(--shadow-md);
+  z-index: 4;
+}
+
+.remove-image:hover {
+  transform: scale(1.1) rotate(90deg);
+  background: var(--warning);
+}
+
+/* Add styles for the input icons to ensure they show */
+.input-icon {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary);
+  font-size: 1.1rem;
+  transition: var(--transition);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Make sure icons show in dark mode */
+.dark-mode .input-icon {
+  color: var(--primary);
+}
+
+.dark-mode .file-label::before {
+  color: var(--primary);
+}
+
+/* Add loading spinner for file upload */
+.upload-spinner {
+  animation: spin 1s linear infinite;
+  margin-right: 0.5rem;
+}
+
+/* Add progress bar for file upload */
+.upload-progress {
+  width: 100%;
+  height: 4px;
+  background: var(--gray-light);
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Add file size validation message */
+.file-size-info {
+  font-size: 0.8rem;
+  color: var(--gray);
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+.file-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+/* Make sure Font Awesome icons are loaded */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+/* Responsive adjustments for file upload */
+@media (max-width: 576px) {
+  .file-label {
+    padding: 0.875rem 0.875rem 0.875rem 3rem;
+    font-size: 0.9rem;
+  }
+  
+  .file-label::before {
+    left: 1rem;
+    font-size: 1rem;
+  }
+  
+  .image-preview {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .remove-image {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Add animation for successful upload */
+@keyframes successPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(6, 214, 160, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(6, 214, 160, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(6, 214, 160, 0);
+  }
+}
+
+.file-upload-success .file-label {
+  border-color: var(--success);
+  background: rgba(6, 214, 160, 0.1);
+  animation: successPulse 1s ease;
+}
+
+.file-upload-success .file-label::before {
+  content: '\f00c';
+  color: var(--success);
+}
