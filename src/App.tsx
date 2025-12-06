@@ -44,7 +44,7 @@ const App: React.FC = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', password: '',
-    matricNumber: '', dateStarted: new Date().toISOString().split('T')[0],
+    dateStarted: new Date().toISOString().split('T')[0],
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,6 @@ const App: React.FC = () => {
       if (isLogin) {
         const res = await API.post('/auth/login', {
           email: formData.email,
-          matricNumber: formData.matricNumber.toUpperCase(),
           password: formData.password
         });
         localStorage.setItem('token', res.data.token);
@@ -126,7 +125,6 @@ const App: React.FC = () => {
       } else {
         await API.post('/auth/register', {
           ...formData,
-          matricNumber: formData.matricNumber.toUpperCase(),
           dateStarted: formData.dateStarted
         });
         alert('🎉 Registration successful! Please log in.');
@@ -143,7 +141,7 @@ const App: React.FC = () => {
   const resetForm = () => {
     setFormData({
       firstName: '', lastName: '', email: '', password: '',
-      matricNumber: '', dateStarted: new Date().toISOString().split('T')[0]
+      dateStarted: new Date().toISOString().split('T')[0]
     });
     setImagePreview(null);
     setShowPassword(false);
@@ -299,18 +297,6 @@ const App: React.FC = () => {
                   placeholder="Email Address"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <FaIdCard className="input-icon" />
-                <input 
-                  type="text" 
-                  placeholder="Matric Number"
-                  value={formData.matricNumber}
-                  onChange={(e) => setFormData({...formData, matricNumber: e.target.value.toUpperCase()})}
-                  style={{ textTransform: 'uppercase' }}
                   required
                 />
               </div>
