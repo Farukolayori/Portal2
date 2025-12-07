@@ -12,7 +12,7 @@ import {
   FaHistory, FaFileExport, FaUserShield,
   FaPlus, FaMinus, FaCalculator, FaPercent, FaCalendarAlt, 
   FaIdCard, FaSchool, FaUniversity, FaCalendar, FaBookOpen,
-  FaClock, FaStar, FaMoneyBillWave, FaLocationArrow,
+  FaClock, FaStar, FaLocationArrow,
   FaPhone, FaAddressCard, FaUserTag, FaHeart
 } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
@@ -55,7 +55,6 @@ interface Course {
   schedule: string;
   description: string;
   progress: number;
-  fees?: number;
   isFavorite: boolean;
 }
 
@@ -73,7 +72,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   
-  // Enhanced registration form
+  // Registration form
   const [formData, setFormData] = useState({
     firstName: '', 
     lastName: '', 
@@ -104,41 +103,8 @@ const App: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [placeholderAnim, setPlaceholderAnim] = useState(false);
 
-  // Student dashboard states
-  const [courses, setCourses] = useState<Course[]>([
-    { 
-      id: '1', 
-      name: 'Data Structures and Algorithms', 
-      code: 'CS201', 
-      creditHours: 3, 
-      grade: 'A', 
-      semester: 'Fall', 
-      year: '2024',
-      instructor: 'Dr. Johnson',
-      room: 'CSB-301',
-      schedule: 'Mon/Wed 10:00-11:30 AM',
-      description: 'Introduction to data structures and algorithm analysis',
-      progress: 85,
-      fees: 1500,
-      isFavorite: true
-    },
-    { 
-      id: '2', 
-      name: 'Database Management Systems', 
-      code: 'CS202', 
-      creditHours: 3, 
-      grade: 'B+', 
-      semester: 'Fall', 
-      year: '2024',
-      instructor: 'Prof. Williams',
-      room: 'CSB-205',
-      schedule: 'Tue/Thu 2:00-3:30 PM',
-      description: 'Fundamentals of database design and SQL',
-      progress: 70,
-      fees: 1500,
-      isFavorite: false
-    },
-  ]);
+  // Student dashboard states - ALL RESET TO EMPTY/NULL
+  const [courses, setCourses] = useState<Course[]>([]); // EMPTY - user will add
   
   const [newCourse, setNewCourse] = useState({
     name: '',
@@ -151,7 +117,6 @@ const App: React.FC = () => {
     room: '',
     schedule: '',
     description: '',
-    fees: 0
   });
   
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
@@ -192,6 +157,9 @@ const App: React.FC = () => {
     cgpa: ''
   });
 
+  // Fix for admin seed - Test admin connection
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
+
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) setDarkMode(JSON.parse(savedDarkMode));
@@ -204,7 +172,8 @@ const App: React.FC = () => {
           console.log('Auto-login response:', res.data);
           setCurrentUser(res.data);
           setIsAuthenticated(true);
-          // Initialize profile data
+          
+          // Initialize profile data from backend
           if (res.data) {
             setProfileData({
               firstName: res.data.firstName || '',
@@ -247,6 +216,72 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Fix for admin seed - Add admin manually function
+  const createAdminManually = async () => {
+    setIsAdminLoading(true);
+    try {
+      toast.info('Creating admin account...');
+      
+      // First register as regular user
+      const registerRes = await API.post('/auth/register', {
+        firstName: 'Admin',
+        lastName: 'User',
+        email: 'admin@csportal.com',
+        password: 'admin123',
+        department: 'Computer Science',
+        level: '500',
+        studentId: 'ADMIN001',
+        phone: '1234567890',
+        address: 'Admin Office',
+        dob: '1990-01-01',
+        gender: 'Male',
+        registrationYear: '2020',
+        graduationYear: '2024',
+        role: 'admin', // Add role here
+        status: 'active'
+      });
+      
+      console.log('Admin registration response:', registerRes.data);
+      
+      // Then login to get token
+      const loginRes = await API.post('/auth/login', {
+        email: 'admin@csportal.com',
+        password: 'admin123'
+      });
+      
+      localStorage.setItem('token', loginRes.data.token);
+      setCurrentUser(loginRes.data.user);
+      setIsAuthenticated(true);
+      
+      toast.success('✅ Admin account created successfully!');
+      toast.info('📧 Email: admin@csportal.com | 🔑 Password: admin123');
+      
+    } catch (err: any) {
+      console.error('Admin creation error:', err);
+      
+      // If admin already exists, try to login
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('already exists')) {
+        try {
+          const loginRes = await API.post('/auth/login', {
+            email: 'admin@csportal.com',
+            password: 'admin123'
+          });
+          
+          localStorage.setItem('token', loginRes.data.token);
+          setCurrentUser(loginRes.data.user);
+          setIsAuthenticated(true);
+          toast.success('Admin login successful!');
+        } catch (loginErr) {
+          toast.error('Admin exists but login failed. Try: admin@csportal.com / admin123');
+        }
+      } else {
+        toast.error('Failed to create admin. Please try manual registration.');
+      }
+    } finally {
+      setIsAdminLoading(false);
+    }
+  };
+
   // Calculate GPA
   const calculateGPA = () => {
     if (courses.length === 0) return '0.00';
@@ -269,13 +304,12 @@ const App: React.FC = () => {
     return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
   };
 
-  // Student dashboard stats
+  // Student dashboard stats - SIMPLIFIED, NO MONEY
   const studentStats = {
     totalCourses: courses.length,
     completedCourses: courses.filter(c => c.progress === 100).length,
     currentGPA: calculateGPA(),
     totalCreditHours: courses.reduce((sum, course) => sum + course.creditHours, 0),
-    totalFees: courses.reduce((sum, course) => sum + (course.fees || 0), 0),
     favoriteCourses: courses.filter(c => c.isFavorite).length,
     semesterGPA: (() => {
       const currentSemesterCourses = courses.filter(c => c.semester === 'Fall' && c.year === '2024');
@@ -484,7 +518,6 @@ const App: React.FC = () => {
       schedule: newCourse.schedule,
       description: newCourse.description,
       progress: 0,
-      fees: newCourse.fees,
       isFavorite: false
     };
     
@@ -500,9 +533,8 @@ const App: React.FC = () => {
       room: '',
       schedule: '',
       description: '',
-      fees: 0
     });
-    toast.success(`Added course: ${newCourse.name}`);
+    toast.success(`✅ Added course: ${newCourse.name}`);
   };
 
   const deleteCourse = (id: string) => {
@@ -613,6 +645,7 @@ const App: React.FC = () => {
       setCurrentUser(null);
       setAllUsers([]);
       setActivityLogs([]);
+      setCourses([]); // Reset courses on logout
       toast.info('👋 Logged out successfully');
     }
   };
@@ -659,6 +692,29 @@ const App: React.FC = () => {
               </div>
               <h1>{isLogin ? 'Welcome Back!' : 'Create Student Account'}</h1>
               <p>Computer Science Department Portal</p>
+              
+              {/* Admin seed fix button - Only show in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px' }}>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '5px' }}>Admin not working?</p>
+                  <button 
+                    onClick={createAdminManually}
+                    disabled={isAdminLoading}
+                    style={{ 
+                      padding: '8px 16px', 
+                      background: 'var(--primary)', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '6px', 
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      width: '100%'
+                    }}
+                  >
+                    {isAdminLoading ? <FaSpinner className="spinner" /> : 'Create Admin Account'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
@@ -1165,12 +1221,12 @@ const App: React.FC = () => {
 
                 <div className="stat-card student">
                   <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #43e97b, #38f9d7)' }}>
-                    <FaMoneyBillWave />
+                    <FaPercent />
                   </div>
                   <div className="stat-info">
-                    <h3>Course Fees</h3>
-                    <div className="stat-number">${studentStats.totalFees}</div>
-                    <div className="stat-change">Total this semester</div>
+                    <h3>Progress</h3>
+                    <div className="stat-number">{studentStats.completedCourses}/{studentStats.totalCourses}</div>
+                    <div className="stat-change">Courses completed</div>
                   </div>
                 </div>
               </div>
@@ -1241,7 +1297,7 @@ const App: React.FC = () => {
             </>
           )}
 
-          {/* MY COURSES - Enhanced with full user input */}
+          {/* MY COURSES - User starts from empty */}
           {activeTab === 'courses' && currentUser?.role === 'student' && (
             <div className="card full-width">
               <div className="card-header">
@@ -1315,22 +1371,6 @@ const App: React.FC = () => {
                           <option key={hours} value={hours}>{hours} credit hour{hours > 1 ? 's' : ''}</option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Course Fees ($)</label>
-                      <input 
-                        type="number"
-                        placeholder="e.g., 1500"
-                        value={newCourse.fees}
-                        onChange={(e) => setNewCourse({...newCourse, fees: parseInt(e.target.value) || 0})}
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px', 
-                          border: '2px solid var(--gray)', 
-                          borderRadius: '8px',
-                          fontSize: '0.95rem'
-                        }}
-                      />
                     </div>
                     
                     {/* Semester & Year */}
@@ -1464,13 +1504,14 @@ const App: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Courses List */}
+                {/* Courses List - EMPTY BY DEFAULT */}
                 <div className="courses-list">
                   {courses.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '60px', color: 'var(--gray)' }}>
                       <FaBookOpen style={{ fontSize: '4rem', marginBottom: '15px', opacity: 0.5 }} />
                       <h3>No courses added yet</h3>
                       <p>Add your first course using the form above</p>
+                      <p style={{ fontSize: '0.9rem', marginTop: '10px' }}>You can add course names, codes, instructors, and all details</p>
                     </div>
                   ) : (
                     <div className="course-grid">
@@ -1526,25 +1567,22 @@ const App: React.FC = () => {
                             
                             <div className="course-details" style={{ marginBottom: '15px' }}>
                               <div className="course-detail">
-                                <FaUserGraduate /> {course.instructor}
+                                <FaUserGraduate /> {course.instructor || 'Not specified'}
                               </div>
                               <div className="course-detail">
                                 <FaCalendarAlt /> {course.semester} {course.year}
                               </div>
                               <div className="course-detail">
-                                <FaLocationArrow /> {course.room}
+                                <FaLocationArrow /> {course.room || 'TBA'}
                               </div>
                               <div className="course-detail">
-                                <FaClock /> {course.schedule}
+                                <FaClock /> {course.schedule || 'Schedule TBA'}
                               </div>
                               <div className="course-detail">
                                 <FaPercent /> {course.creditHours} Credits
                               </div>
                               <div className="course-detail">
                                 <FaTrophy /> Grade: {course.grade}
-                              </div>
-                              <div className="course-detail">
-                                <FaMoneyBillWave /> ${course.fees}
                               </div>
                             </div>
                             
@@ -1672,105 +1710,115 @@ const App: React.FC = () => {
 
                 {/* Grades Table */}
                 <div className="grades-table-container">
-                  <table className="grades-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--gray-light)' }}>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Course</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Code</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Credits</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Semester</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Current Grade</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Grade Points</th>
-                        <th style={{ padding: '15px', textAlign: 'left' }}>Update Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {courses.map(course => {
-                        const gradePoints: { [key: string]: number } = {
-                          'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
-                          'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
-                        };
-                        const points = gradePoints[course.grade.toUpperCase()] || 0;
-                        
-                        return (
-                          <tr key={course.id} style={{ borderBottom: '1px solid var(--gray-light)' }}>
-                            <td style={{ padding: '15px' }}>{course.name}</td>
-                            <td style={{ padding: '15px' }}>{course.code}</td>
-                            <td style={{ padding: '15px' }}>{course.creditHours}</td>
-                            <td style={{ padding: '15px' }}>{course.semester} {course.year}</td>
-                            <td style={{ padding: '15px' }}>
-                              <span className={`grade-badge ${course.grade}`}>
-                                {course.grade}
-                              </span>
-                            </td>
-                            <td style={{ padding: '15px' }}>{(points * course.creditHours).toFixed(1)}</td>
-                            <td style={{ padding: '15px' }}>
-                              <select
-                                value={course.grade}
-                                onChange={(e) => updateGrade(course.id, e.target.value)}
-                                style={{ 
-                                  padding: '8px 12px', 
-                                  border: '2px solid var(--gray)', 
-                                  borderRadius: '6px',
-                                  fontSize: '0.9rem'
-                                }}
-                              >
-                                {gradeOptions.map(grade => (
-                                  <option key={grade} value={grade}>{grade}</option>
-                                ))}
-                              </select>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {courses.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray)' }}>
+                      <FaTrophy style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.5 }} />
+                      <h3>No courses added yet</h3>
+                      <p>Add courses in "My Courses" tab to see your grades here</p>
+                    </div>
+                  ) : (
+                    <table className="grades-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--gray-light)' }}>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Course</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Code</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Credits</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Semester</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Current Grade</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Grade Points</th>
+                          <th style={{ padding: '15px', textAlign: 'left' }}>Update Grade</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {courses.map(course => {
+                          const gradePoints: { [key: string]: number } = {
+                            'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+                            'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
+                          };
+                          const points = gradePoints[course.grade.toUpperCase()] || 0;
+                          
+                          return (
+                            <tr key={course.id} style={{ borderBottom: '1px solid var(--gray-light)' }}>
+                              <td style={{ padding: '15px' }}>{course.name}</td>
+                              <td style={{ padding: '15px' }}>{course.code}</td>
+                              <td style={{ padding: '15px' }}>{course.creditHours}</td>
+                              <td style={{ padding: '15px' }}>{course.semester} {course.year}</td>
+                              <td style={{ padding: '15px' }}>
+                                <span className={`grade-badge ${course.grade}`}>
+                                  {course.grade}
+                                </span>
+                              </td>
+                              <td style={{ padding: '15px' }}>{(points * course.creditHours).toFixed(1)}</td>
+                              <td style={{ padding: '15px' }}>
+                                <select
+                                  value={course.grade}
+                                  onChange={(e) => updateGrade(course.id, e.target.value)}
+                                  style={{ 
+                                    padding: '8px 12px', 
+                                    border: '2px solid var(--gray)', 
+                                    borderRadius: '6px',
+                                    fontSize: '0.9rem'
+                                  }}
+                                >
+                                  {gradeOptions.map(grade => (
+                                    <option key={grade} value={grade}>{grade}</option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
 
                 {/* Grade Distribution Chart */}
-                <div className="grade-distribution" style={{ marginTop: '40px', padding: '20px', background: 'var(--gray-light)', borderRadius: '10px' }}>
-                  <h4 style={{ marginBottom: '20px' }}>Grade Distribution</h4>
-                  <div style={{ display: 'flex', gap: '15px', marginTop: '10px', alignItems: 'flex-end', height: '150px' }}>
-                    {gradeOptions.slice(0, -1).map(grade => {
-                      const count = courses.filter(c => c.grade === grade).length;
-                      const percentage = courses.length > 0 ? (count / courses.length * 100) : 0;
-                      const height = Math.max(30, percentage * 1.2); // Minimum height of 30px
-                      
-                      return (
-                        <div key={grade} style={{ flex: 1, textAlign: 'center' }}>
-                          <div style={{ 
-                            height: `${height}px`, 
-                            background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                            borderRadius: '6px 6px 0 0',
-                            position: 'relative',
-                            transition: 'height 0.5s ease'
-                          }}>
+                {courses.length > 0 && (
+                  <div className="grade-distribution" style={{ marginTop: '40px', padding: '20px', background: 'var(--gray-light)', borderRadius: '10px' }}>
+                    <h4 style={{ marginBottom: '20px' }}>Grade Distribution</h4>
+                    <div style={{ display: 'flex', gap: '15px', marginTop: '10px', alignItems: 'flex-end', height: '150px' }}>
+                      {gradeOptions.slice(0, -1).map(grade => {
+                        const count = courses.filter(c => c.grade === grade).length;
+                        const percentage = courses.length > 0 ? (count / courses.length * 100) : 0;
+                        const height = Math.max(30, percentage * 1.2);
+                        
+                        return (
+                          <div key={grade} style={{ flex: 1, textAlign: 'center' }}>
                             <div style={{ 
-                              position: 'absolute', 
-                              top: '-25px', 
-                              left: '0', 
-                              right: '0', 
-                              fontWeight: 'bold' 
+                              height: `${height}px`, 
+                              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                              borderRadius: '6px 6px 0 0',
+                              position: 'relative',
+                              transition: 'height 0.5s ease'
                             }}>
-                              {count}
+                              <div style={{ 
+                                position: 'absolute', 
+                                top: '-25px', 
+                                left: '0', 
+                                right: '0', 
+                                fontWeight: 'bold' 
+                              }}>
+                                {count}
+                              </div>
+                            </div>
+                            <div style={{ marginTop: '10px' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{grade}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
+                                {percentage.toFixed(1)}%
+                              </div>
                             </div>
                           </div>
-                          <div style={{ marginTop: '10px' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{grade}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
-                              {percentage.toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* MY PROFILE - Enhanced with editable fields */}
+          {/* MY PROFILE */}
           {activeTab === 'profile' && currentUser?.role === 'student' && (
             <div className="card full-width">
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2214,8 +2262,6 @@ const App: React.FC = () => {
                       </h4>
                       <div className="activity-timeline" style={{ marginTop: '15px' }}>
                         {[
-                          { action: 'Updated grade for Data Structures', time: '2 hours ago', icon: <FaTrophy /> },
-                          { action: 'Added new course: Web Development', time: '1 day ago', icon: <FaBookOpen /> },
                           { action: 'Updated profile information', time: '3 days ago', icon: <FaEdit /> },
                           { action: 'Logged in to portal', time: '1 week ago', icon: <FaSignOutAlt /> },
                           { action: 'Registered for semester', time: '2 weeks ago', icon: <FaCalendar /> },
@@ -2254,7 +2300,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* ADMIN SECTIONS (Keep existing) */}
+          {/* ADMIN SECTIONS */}
           {activeTab === 'dashboard' && currentUser?.role === 'admin' && (
             <>
               <div className="stats-cards">
