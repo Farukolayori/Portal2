@@ -11,7 +11,9 @@ import {
   FaCode, FaLaptopCode, FaCertificate,
   FaShieldAlt, FaHistory, FaFileExport, FaUserShield
 } from 'react-icons/fa';
-import API from './api';  // Import the new API helper
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import API from './api';
 import './App.css';
 
 interface User {
@@ -44,7 +46,6 @@ const App: React.FC = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', password: '',
-    dateStarted: new Date().toISOString().split('T')[0],
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,7 @@ const App: React.FC = () => {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [placeholderAnim, setPlaceholderAnim] = useState(false);
 
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode');
@@ -68,13 +70,15 @@ const App: React.FC = () => {
     const savedToken = localStorage.getItem('token');
     if (savedToken && !isAuthenticated) {
       setLoading(true);
-      API.get('/auth/user')  // Assuming you add this endpoint; fallback to /user if different
+      API.get('/auth/user')
         .then((res) => {
           setCurrentUser(res.data);
           setIsAuthenticated(true);
+          toast.success('Welcome back! Auto-login successful');
         })
         .catch(() => {
           localStorage.removeItem('token');
+          toast.error('Session expired. Please login again');
         })
         .finally(() => setLoading(false));
     }
@@ -86,6 +90,14 @@ const App: React.FC = () => {
       loadAdminData();
     }
   }, [isAuthenticated, currentUser?.role, searchTerm, filterRole, filterStatus]);
+
+  useEffect(() => {
+    // Animate placeholders
+    const interval = setInterval(() => {
+      setPlaceholderAnim(prev => !prev);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadAdminData = async () => {
     setLoadingUsers(true);
@@ -102,7 +114,7 @@ const App: React.FC = () => {
       })));
     } catch (err) {
       console.error('Failed to load admin data:', err);
-      // alert('Failed to load data. Backend might be sleeping—try again in 30s.');
+      toast.error('Failed to load data. Please try again');
     } finally {
       setLoadingUsers(false);
     }
@@ -121,18 +133,20 @@ const App: React.FC = () => {
         localStorage.setItem('token', res.data.token);
         setCurrentUser(res.data.user);
         setIsAuthenticated(true);
-        alert('✅ Welcome back!');
+        toast.success('🎉 Welcome back! Login successful');
       } else {
         await API.post('/auth/register', {
           ...formData,
-          dateStarted: formData.dateStarted
+          dateStarted: new Date().toISOString().split('T')[0],
+          matricNumber: `CS/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+          department: 'Computer Science'
         });
-        alert('🎉 Registration successful! Please log in.');
+        toast.success('🎉 Registration successful! Please log in.');
         setIsLogin(true);
         resetForm();
       }
     } catch (err: any) {
-      alert(`❌ ${err.response?.data?.message || 'Error occurred'}`);
+      toast.error(`❌ ${err.response?.data?.message || 'Error occurred'}`);
     } finally {
       setLoading(false);
     }
@@ -141,7 +155,6 @@ const App: React.FC = () => {
   const resetForm = () => {
     setFormData({
       firstName: '', lastName: '', email: '', password: '',
-      dateStarted: new Date().toISOString().split('T')[0]
     });
     setImagePreview(null);
     setShowPassword(false);
@@ -149,14 +162,14 @@ const App: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('⚠️ Delete user?')) {
+    if (window.confirm('⚠️ Are you sure you want to delete this user?')) {
       try {
         await API.delete(`/users/${id}`);
         setAllUsers(allUsers.filter(u => u._id !== id));
-        alert('✅ User deleted');
-        loadAdminData();  // Refresh logs
+        toast.success('✅ User deleted successfully');
+        loadAdminData();
       } catch (err: any) {
-        alert(`❌ ${err.response?.data?.message || 'Delete failed'}`);
+        toast.error(`❌ ${err.response?.data?.message || 'Delete failed'}`);
       }
     }
   };
@@ -171,12 +184,12 @@ const App: React.FC = () => {
       try {
         await API.put(`/users/${editingUser._id}`, editingUser);
         setAllUsers(allUsers.map(u => u._id === editingUser._id ? editingUser : u));
-        alert('✅ User updated');
+        toast.success('✅ User updated successfully');
         setShowEditModal(false);
         setEditingUser(null);
-        loadAdminData();  // Refresh logs
+        loadAdminData();
       } catch (err: any) {
-        alert(`❌ ${err.response?.data?.message || 'Update failed'}`);
+        toast.error(`❌ ${err.response?.data?.message || 'Update failed'}`);
       }
     }
   };
@@ -185,11 +198,14 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('📦 File size should be less than 5MB');
+        toast.error('📦 File size should be less than 5MB');
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        toast.info('📸 Profile image selected');
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -198,6 +214,7 @@ const App: React.FC = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem('darkMode', JSON.stringify(newMode));
+    toast.info(newMode ? '🌙 Dark mode enabled' : '☀️ Light mode enabled');
   };
 
   const exportUsers = async () => {
@@ -208,9 +225,9 @@ const App: React.FC = () => {
       a.href = url;
       a.download = 'cs_students.csv';
       a.click();
-      alert('✅ Data exported successfully');
+      toast.success('✅ Data exported successfully');
     } catch (err: any) {
-      alert(`❌ ${err.response?.data?.message || 'Export failed'}`);
+      toast.error(`❌ ${err.response?.data?.message || 'Export failed'}`);
     }
   };
 
@@ -233,19 +250,39 @@ const App: React.FC = () => {
   };
 
   const logout = () => {
-    if (window.confirm('Are you sure?')) {
+    if (window.confirm('Are you sure you want to logout?')) {
       localStorage.removeItem('token');
       setIsAuthenticated(false);
       setCurrentUser(null);
       setAllUsers([]);
       setActivityLogs([]);
-      alert('👋 Logged out');
+      toast.info('👋 Logged out successfully');
     }
+  };
+
+  const placeholderTexts = {
+    firstName: placeholderAnim ? 'John' : 'First Name',
+    lastName: placeholderAnim ? 'Doe' : 'Last Name',
+    email: placeholderAnim ? 'john.doe@university.edu' : 'Email Address',
+    password: placeholderAnim ? '••••••••' : 'Password'
   };
 
   if (!isAuthenticated) {
     return (
       <div className={`auth-container ${darkMode ? 'dark-mode' : ''}`}>
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme={darkMode ? 'dark' : 'light'}
+        />
+        
         <div className="floating-shapes">
           <div className="shape shape-1"></div>
           <div className="shape shape-2"></div>
@@ -271,20 +308,22 @@ const App: React.FC = () => {
                     <FaUser className="input-icon" />
                     <input 
                       type="text" 
-                      placeholder="First Name"
+                      placeholder={placeholderTexts.firstName}
                       value={formData.firstName}
                       onChange={(e) => setFormData({...formData, firstName: e.target.value})}
                       required
+                      className={placeholderAnim ? 'placeholder-anim' : ''}
                     />
                   </div>
                   <div className="form-group">
                     <FaUser className="input-icon" />
                     <input 
                       type="text" 
-                      placeholder="Last Name"
+                      placeholder={placeholderTexts.lastName}
                       value={formData.lastName}
                       onChange={(e) => setFormData({...formData, lastName: e.target.value})}
                       required
+                      className={placeholderAnim ? 'placeholder-anim' : ''}
                     />
                   </div>
                 </div>
@@ -294,10 +333,11 @@ const App: React.FC = () => {
                 <FaEnvelope className="input-icon" />
                 <input 
                   type="email" 
-                  placeholder="Email Address"
+                  placeholder={placeholderTexts.email}
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   required
+                  className={placeholderAnim ? 'placeholder-anim' : ''}
                 />
               </div>
 
@@ -305,10 +345,11 @@ const App: React.FC = () => {
                 <FaLock className="input-icon" />
                 <input 
                   type={showPassword ? "text" : "password"} 
-                  placeholder={isLogin ? "Password" : "Create Password"}
+                  placeholder={placeholderTexts.password}
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   required={!forgotMatricMode}
+                  className={placeholderAnim ? 'placeholder-anim' : ''}
                 />
                 {!forgotMatricMode && (
                   <button 
@@ -323,16 +364,6 @@ const App: React.FC = () => {
 
               {!isLogin && (
                 <>
-                  <div className="form-group">
-                    <FaCalendarAlt className="input-icon" />
-                    <input 
-                      type="date" 
-                      value={formData.dateStarted}
-                      onChange={(e) => setFormData({...formData, dateStarted: e.target.value})}
-                      required
-                    />
-                  </div>
-
                   <div className="form-group file-group">
                     <FaImage className="input-icon" />
                     <label htmlFor="file-upload" className="file-label">
@@ -351,7 +382,10 @@ const App: React.FC = () => {
                       <img src={imagePreview} alt="Preview" />
                       <button 
                         type="button" 
-                        onClick={() => setImagePreview(null)}
+                        onClick={() => {
+                          setImagePreview(null);
+                          toast.info('Image removed');
+                        }}
                         className="remove-image"
                       >
                         <FaTimes />
@@ -373,7 +407,10 @@ const App: React.FC = () => {
                 <button 
                   type="button" 
                   className="link-btn"
-                  onClick={() => setForgotMatricMode(true)}
+                  onClick={() => {
+                    setForgotMatricMode(true);
+                    toast.info('Matric number recovery initiated');
+                  }}
                 >
                   <FaExclamationTriangle /> Forgot Matric Number?
                 </button>
@@ -386,7 +423,8 @@ const App: React.FC = () => {
                   className="switch-btn"
                   onClick={() => { 
                     setIsLogin(!isLogin); 
-                    resetForm(); 
+                    resetForm();
+                    toast.info(isLogin ? 'Switched to registration' : 'Switched to login');
                   }}
                 >
                   {isLogin ? 'Sign Up Now' : 'Sign In'}
@@ -417,10 +455,22 @@ const App: React.FC = () => {
     );
   }
 
-  // Dashboard JSX (same as your original, with minor updates for loading)
   return (
     <div className={`dashboard ${darkMode ? 'dark-mode' : ''}`}>
-      {/* Sidebar - unchanged */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme={darkMode ? 'dark' : 'light'}
+      />
+      
+      {/* Sidebar */}
       <div className={`sidebar ${currentUser?.role === 'admin' ? 'admin-sidebar' : ''}`}>
         <div className="sidebar-header">
           <div className="user-profile">
@@ -755,7 +805,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Other tabs (analytics, activity, courses, etc.) - unchanged from your original */}
           {activeTab === 'analytics' && currentUser?.role === 'admin' && (
             <div className="content-grid">
               <div className="card admin-card full-width">
@@ -769,7 +818,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {/* ... rest unchanged */}
             </div>
           )}
 
@@ -799,9 +847,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Student tabs and settings - unchanged */}
           {activeTab === 'courses' && currentUser?.role === 'student' && (
-            // ... your original courses JSX
             <div className="content-grid">
               <div className="card full-width">
                 <div className="card-header">
@@ -836,8 +882,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Add other student tabs similarly if needed */}
-
           {activeTab === 'settings' && (
             <div className="card full-width">
               <div className="card-header">
@@ -862,7 +906,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Modal - unchanged, but add dark mode support */}
+      {/* Edit Modal */}
       {showEditModal && editingUser && (
         <div style={{
           position: 'fixed',
