@@ -1,13 +1,14 @@
-// frontend/src/api.ts - UPDATED
+// frontend/src/api.ts - ULTIMATE VERSION
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const API = axios.create({
-  baseURL: 'https://userbackend-slns.onrender.com/api',  // Your actual backend URL
+  baseURL: 'https://userbackend-slns.onrender.com/api',
+  timeout: 90000, // 90 seconds — REQUIRED for Render free tier
   withCredentials: true,
-  timeout: 30000,  // Increase timeout for Render (free tier is slow)
   headers: {
     'Content-Type': 'application/json',
-  }
+  },
 });
 
 // Request interceptor
@@ -17,47 +18,51 @@ API.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('📡 Making request to:', config.url);
+    console.log('Request →', config.method?.toUpperCase(), config.url);
     return config;
   },
-  (error) => {
-    console.error('❌ Request error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor with better error handling
+// Response interceptor with toast + smart Render handling
 API.interceptors.response.use(
   (response) => {
-    console.log('✅ Response from:', response.config.url, response.status);
+    // Optional: toast.success('Data loaded successfully');
     return response;
   },
   (error) => {
-    console.error('🚨 API Error Details:');
-    console.error('URL:', error.config?.url);
-    console.error('Method:', error.config?.method);
-    console.error('Status:', error.response?.status);
-    console.error('Message:', error.message);
-    console.error('Response Data:', error.response?.data);
-    
-    // Special handling for Render free tier
-    if (error.code === 'ECONNABORTED') {
-      console.error('⏰ Render free tier timeout - backend might be sleeping');
-      alert('Backend is waking up (Render free tier). Please try again in 30 seconds.');
-      return Promise.reject(new Error('Backend is waking up. Please wait and try again.'));
+    const url = error.config?.url;
+    const status = error.response?.status;
+
+    // Render Free Tier Cold Start
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      toast.warn('Backend is waking up (free hosting)... Please wait 20-40 seconds', {
+        autoClose: 8000,
+        toastId: 'render-wakeup'
+      });
+      return Promise.reject(error);
     }
-    
-    if (!error.response) {
-      console.error('🌐 No response - Check: 1) Backend URL 2) CORS 3) Network');
-      alert('Cannot connect to backend. Please check your internet connection.');
-      return Promise.reject(new Error('Network error. Please check your connection.'));
+
+    // Server down / deploying
+    if (status >= 500 || status === 502 || status === 503 || status === 404) {
+      toast.error('Server is currently unavailable. Please try again in a minute.', {
+        toastId: 'server-down'
+      });
+      return Promise.reject(error);
     }
-    
-    if (error.response?.status === 502 || error.response?.status === 503) {
-      console.error('🔧 Backend is down or deploying');
-      alert('Backend is currently unavailable. Please try again in a few minutes.');
+
+    // Unauthorized - auto logout
+    if (status === 401) {
+      localStorage.removeItem('token');
+      toast.error('Session expired. Please login again.');
+      setTimeout(() => window.location.reload(), 2000);
+      return Promise.reject(error);
     }
-    
+
+    // Client errors (400, 403, etc)
+    const message = error.response?.data?.message || error.message || 'Request failed';
+    toast.error(message);
+
     return Promise.reject(error);
   }
 );
