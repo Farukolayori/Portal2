@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FaUser, FaEnvelope, FaLock, FaImage, FaEye, FaEyeSlash, 
-  FaUserCircle, FaCalendarAlt, FaChartBar, FaUsers, FaTrash, 
+  FaUserCircle, FaChartBar, FaUsers, FaTrash, 
   FaEdit, FaSignOutAlt, FaHome, FaUserPlus, FaChartPie, 
   FaBell, FaCog, FaSearch, FaFilter, FaDownload,
   FaGraduationCap, FaBook, FaTrophy,
-  FaCheckCircle, FaTimes, FaSpinner, FaIdCard,
+  FaCheckCircle, FaTimes, FaSpinner,
   FaChartLine, FaUserGraduate,
   FaMoon, FaSun, FaExclamationTriangle,
   FaCode, FaLaptopCode, FaCertificate,
-  FaShieldAlt, FaHistory, FaFileExport, FaUserShield
+  FaHistory, FaFileExport, FaUserShield
 } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -66,17 +66,18 @@ const App: React.FC = () => {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) setDarkMode(JSON.parse(savedDarkMode));
 
-    // Auto-login if token exists
     const savedToken = localStorage.getItem('token');
     if (savedToken && !isAuthenticated) {
       setLoading(true);
       API.get('/auth/user')
         .then((res) => {
+          console.log('Auto-login response:', res.data);
           setCurrentUser(res.data);
           setIsAuthenticated(true);
           toast.success('Welcome back! Auto-login successful');
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error('Auto-login error:', err);
           localStorage.removeItem('token');
           toast.error('Session expired. Please login again');
         })
@@ -85,14 +86,12 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Load data for admin
     if (isAuthenticated && currentUser?.role === 'admin') {
       loadAdminData();
     }
   }, [isAuthenticated, currentUser?.role, searchTerm, filterRole, filterStatus]);
 
   useEffect(() => {
-    // Animate placeholders
     const interval = setInterval(() => {
       setPlaceholderAnim(prev => !prev);
     }, 3000);
@@ -102,10 +101,13 @@ const App: React.FC = () => {
   const loadAdminData = async () => {
     setLoadingUsers(true);
     try {
+      console.log('Loading admin data...');
       const [usersRes, logsRes] = await Promise.all([
         API.get('/users', { params: { search: searchTerm, role: filterRole, status: filterStatus } }),
         API.get('/logs')
       ]);
+      console.log('Users response:', usersRes.data);
+      console.log('Logs response:', logsRes.data);
       setAllUsers(usersRes.data);
       setActivityLogs(logsRes.data.map((log: any) => ({
         ...log,
@@ -126,27 +128,41 @@ const App: React.FC = () => {
 
     try {
       if (isLogin) {
+        console.log('Attempting login with:', { email: formData.email });
         const res = await API.post('/auth/login', {
           email: formData.email,
           password: formData.password
         });
+        console.log('Login response:', res.data);
         localStorage.setItem('token', res.data.token);
         setCurrentUser(res.data.user);
         setIsAuthenticated(true);
         toast.success('🎉 Welcome back! Login successful');
       } else {
-        await API.post('/auth/register', {
-          ...formData,
-          dateStarted: new Date().toISOString().split('T')[0],
-          matricNumber: `CS/${new Date().getFullYear()}/${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-          department: 'Computer Science'
-        });
+        console.log('Attempting registration with:', formData);
+        const res = await API.post('/auth/register', formData);
+        console.log('Registration response:', res.data);
         toast.success('🎉 Registration successful! Please log in.');
         setIsLogin(true);
         resetForm();
       }
     } catch (err: any) {
-      toast.error(`❌ ${err.response?.data?.message || 'Error occurred'}`);
+      console.error('Full error:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      console.error('Error headers:', err.response?.headers);
+      
+      if (err.code === 'ECONNABORTED') {
+        toast.error('⏰ Request timeout. Backend might be sleeping. Please try again in 30 seconds.');
+      } else if (!err.response) {
+        toast.error('🌐 Network error. Please check your internet connection or the backend might be down.');
+      } else if (err.response?.status === 404) {
+        toast.error('🔍 Backend endpoint not found. Please check the API URL.');
+      } else if (err.response?.status === 500) {
+        toast.error('⚙️ Server error. Please try again later.');
+      } else {
+        toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please check console for details.'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -169,6 +185,7 @@ const App: React.FC = () => {
         toast.success('✅ User deleted successfully');
         loadAdminData();
       } catch (err: any) {
+        console.error('Delete error:', err);
         toast.error(`❌ ${err.response?.data?.message || 'Delete failed'}`);
       }
     }
@@ -189,6 +206,7 @@ const App: React.FC = () => {
         setEditingUser(null);
         loadAdminData();
       } catch (err: any) {
+        console.error('Update error:', err);
         toast.error(`❌ ${err.response?.data?.message || 'Update failed'}`);
       }
     }
@@ -227,6 +245,7 @@ const App: React.FC = () => {
       a.click();
       toast.success('✅ Data exported successfully');
     } catch (err: any) {
+      console.error('Export error:', err);
       toast.error(`❌ ${err.response?.data?.message || 'Export failed'}`);
     }
   };
@@ -350,6 +369,7 @@ const App: React.FC = () => {
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   required={!forgotMatricMode}
                   className={placeholderAnim ? 'placeholder-anim' : ''}
+                  minLength={6}
                 />
                 {!forgotMatricMode && (
                   <button 
@@ -470,7 +490,6 @@ const App: React.FC = () => {
         theme={darkMode ? 'dark' : 'light'}
       />
       
-      {/* Sidebar */}
       <div className={`sidebar ${currentUser?.role === 'admin' ? 'admin-sidebar' : ''}`}>
         <div className="sidebar-header">
           <div className="user-profile">
@@ -581,7 +600,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="main-content">
         <div className="header">
           <div className="header-left">
@@ -906,7 +924,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Modal */}
       {showEditModal && editingUser && (
         <div style={{
           position: 'fixed',
