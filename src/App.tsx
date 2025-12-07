@@ -21,8 +21,6 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  matricNumber: string;
-  dateStarted: string;
   department: string;
   role: string;
   level?: string;
@@ -150,18 +148,17 @@ const App: React.FC = () => {
       console.error('Full error:', err);
       console.error('Error response:', err.response?.data);
       console.error('Error status:', err.response?.status);
-      console.error('Error headers:', err.response?.headers);
       
       if (err.code === 'ECONNABORTED') {
-        toast.error('⏰ Request timeout. Backend might be sleeping. Please try again in 30 seconds.');
+        toast.error('⏰ Request timeout. Please try again.');
       } else if (!err.response) {
-        toast.error('🌐 Network error. Please check your internet connection or the backend might be down.');
+        toast.error('🌐 Network error. Please check your internet connection.');
       } else if (err.response?.status === 404) {
-        toast.error('🔍 Backend endpoint not found. Please check the API URL.');
+        toast.error('🔍 Backend endpoint not found.');
       } else if (err.response?.status === 500) {
         toast.error('⚙️ Server error. Please try again later.');
       } else {
-        toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please check console for details.'}`);
+        toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please try again.'}`);
       }
     } finally {
       setLoading(false);
@@ -241,7 +238,7 @@ const App: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'cs_students.csv';
+      a.download = 'users.csv';
       a.click();
       toast.success('✅ Data exported successfully');
     } catch (err: any) {
@@ -254,8 +251,7 @@ const App: React.FC = () => {
     const search = searchTerm.toLowerCase();
     const matchSearch = !searchTerm || 
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(search) ||
-      u.email.toLowerCase().includes(search) ||
-      u.matricNumber.toLowerCase().includes(search);
+      u.email.toLowerCase().includes(search);
     const matchRole = filterRole === 'all' || u.role === filterRole;
     const matchStatus = filterStatus === 'all' || u.status === filterStatus;
     return matchSearch && matchRole && matchStatus;
@@ -316,7 +312,7 @@ const App: React.FC = () => {
                 <FaGraduationCap />
                 <span>CS Portal</span>
               </div>
-              <h1>{forgotMatricMode ? 'Retrieve Matric' : isLogin ? 'Welcome Back!' : 'Join CS Department'}</h1>
+              <h1>{isLogin ? 'Welcome Back!' : 'Join CS Department'}</h1>
               <p>Computer Science Department Portal</p>
             </div>
 
@@ -367,19 +363,17 @@ const App: React.FC = () => {
                   placeholder={placeholderTexts.password}
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  required={!forgotMatricMode}
+                  required
                   className={placeholderAnim ? 'placeholder-anim' : ''}
                   minLength={6}
                 />
-                {!forgotMatricMode && (
-                  <button 
-                    type="button" 
-                    className="toggle-password"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                  </button>
-                )}
+                <button 
+                  type="button" 
+                  className="toggle-password"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
               </div>
 
               {!isLogin && (
@@ -422,19 +416,6 @@ const App: React.FC = () => {
                   <>{isLogin ? <><FaSignOutAlt /> Sign In</> : <><FaUserPlus /> Create Account</>}</>
                 )}
               </button>
-
-              {isLogin && !forgotMatricMode && (
-                <button 
-                  type="button" 
-                  className="link-btn"
-                  onClick={() => {
-                    setForgotMatricMode(true);
-                    toast.info('Matric number recovery initiated');
-                  }}
-                >
-                  <FaExclamationTriangle /> Forgot Matric Number?
-                </button>
-              )}
 
               <div className="auth-footer">
                 <p>{isLogin ? "Don't have an account?" : "Already have an account?"}</p>
@@ -767,9 +748,8 @@ const App: React.FC = () => {
                       <thead>
                         <tr>
                           <th>User</th>
-                          <th>Matric Number</th>
-                          <th>Level</th>
-                          <th>CGPA</th>
+                          <th>Email</th>
+                          <th>Department</th>
                           <th>Role</th>
                           <th>Status</th>
                           <th>Actions</th>
@@ -786,13 +766,12 @@ const App: React.FC = () => {
                                 <div>
                                   <strong>{user.firstName} {user.lastName}</strong>
                                   <br />
-                                  <small>{user.email}</small>
+                                  <small>Joined: {new Date(user.lastActive || '').toLocaleDateString()}</small>
                                 </div>
                               </div>
                             </td>
-                            <td style={{ fontFamily: 'monospace' }}>{user.matricNumber}</td>
-                            <td>{user.level || 'N/A'}</td>
-                            <td><strong>{user.cgpa || 'N/A'}</strong></td>
+                            <td>{user.email}</td>
+                            <td>{user.department}</td>
                             <td>
                               <span className={`role-badge ${user.role}`}>
                                 {user.role}
@@ -975,10 +954,40 @@ const App: React.FC = () => {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Level</label>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Email</label>
+                <input 
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Department</label>
+                <input 
+                  type="text"
+                  value={editingUser.department}
+                  onChange={(e) => setEditingUser({...editingUser, department: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Role</label>
                 <select
-                  value={editingUser.level || ''}
-                  onChange={(e) => setEditingUser({...editingUser, level: e.target.value})}
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
                   style={{ 
                     width: '100%', padding: '10px', 
                     border: '2px solid var(--gray-light)', 
@@ -987,11 +996,8 @@ const App: React.FC = () => {
                     color: darkMode ? 'white' : 'black'
                   }}
                 >
-                  <option value="100">100</option>
-                  <option value="200">200</option>
-                  <option value="300">300</option>
-                  <option value="400">400</option>
-                  <option value="500">500</option>
+                  <option value="student">Student</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
               <div>
