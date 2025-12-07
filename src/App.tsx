@@ -9,7 +9,8 @@ import {
   FaChartLine, FaUserGraduate,
   FaMoon, FaSun, FaExclamationTriangle,
   FaCode, FaLaptopCode, FaCertificate,
-  FaHistory, FaFileExport, FaUserShield
+  FaHistory, FaFileExport, FaUserShield,
+  FaPlus, FaMinus, FaCalculator, FaPercent, FaCalendarAlt, FaIdCard
 } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -27,6 +28,17 @@ interface User {
   cgpa?: string;
   status?: string;
   lastActive?: string;
+  createdAt?: string;
+}
+
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+  creditHours: number;
+  grade: string;
+  semester: string;
+  progress: number;
 }
 
 interface ActivityLog {
@@ -59,6 +71,26 @@ const App: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [placeholderAnim, setPlaceholderAnim] = useState(false);
+
+  // Student dashboard states
+  const [courses, setCourses] = useState<Course[]>([
+    { id: '1', name: 'Data Structures', code: 'CS201', creditHours: 3, grade: 'A', semester: 'Fall 2024', progress: 85 },
+    { id: '2', name: 'Database Systems', code: 'CS202', creditHours: 3, grade: 'B+', semester: 'Fall 2024', progress: 70 },
+    { id: '3', name: 'Web Development', code: 'CS203', creditHours: 4, grade: 'A-', semester: 'Fall 2024', progress: 90 },
+  ]);
+  const [newCourse, setNewCourse] = useState({
+    name: '',
+    code: '',
+    creditHours: 3,
+    grade: '',
+    semester: 'Fall 2024'
+  });
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [showGradeModal, setShowGradeModal] = useState(false);
+  const [selectedCourseForGrade, setSelectedCourseForGrade] = useState<Course | null>(null);
+  const [newGrade, setNewGrade] = useState('');
+  const [semesters, setSemesters] = useState<string[]>(['Fall 2024', 'Spring 2024', 'Fall 2023', 'Spring 2023']);
 
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode');
@@ -95,6 +127,57 @@ const App: React.FC = () => {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Calculate GPA
+  const calculateGPA = () => {
+    if (courses.length === 0) return 0;
+    
+    const gradePoints: { [key: string]: number } = {
+      'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+      'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
+    };
+    
+    let totalPoints = 0;
+    let totalCredits = 0;
+    
+    courses.forEach(course => {
+      if (course.grade && gradePoints[course.grade.toUpperCase()] !== undefined) {
+        totalPoints += gradePoints[course.grade.toUpperCase()] * course.creditHours;
+        totalCredits += course.creditHours;
+      }
+    });
+    
+    return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
+  };
+
+  // Student dashboard stats
+  const studentStats = {
+    totalCourses: courses.length,
+    completedCourses: courses.filter(c => c.progress === 100).length,
+    currentGPA: calculateGPA(),
+    totalCreditHours: courses.reduce((sum, course) => sum + course.creditHours, 0),
+    semesterGPA: (() => {
+      const currentSemesterCourses = courses.filter(c => c.semester === 'Fall 2024');
+      if (currentSemesterCourses.length === 0) return '0.00';
+      
+      const gradePoints: { [key: string]: number } = {
+        'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+        'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
+      };
+      
+      let totalPoints = 0;
+      let totalCredits = 0;
+      
+      currentSemesterCourses.forEach(course => {
+        if (course.grade && gradePoints[course.grade.toUpperCase()] !== undefined) {
+          totalPoints += gradePoints[course.grade.toUpperCase()] * course.creditHours;
+          totalCredits += course.creditHours;
+        }
+      });
+      
+      return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
+    })()
+  };
 
   const loadAdminData = async () => {
     setLoadingUsers(true);
@@ -209,6 +292,48 @@ const App: React.FC = () => {
     }
   };
 
+  // Student course functions
+  const addCourse = () => {
+    if (!newCourse.name || !newCourse.code) {
+      toast.error('Please fill in course name and code');
+      return;
+    }
+    
+    const newCourseObj: Course = {
+      id: Date.now().toString(),
+      name: newCourse.name,
+      code: newCourse.code,
+      creditHours: newCourse.creditHours,
+      grade: newCourse.grade || 'Not Graded',
+      semester: newCourse.semester,
+      progress: 0
+    };
+    
+    setCourses([...courses, newCourseObj]);
+    setNewCourse({ name: '', code: '', creditHours: 3, grade: '', semester: 'Fall 2024' });
+    toast.success(`Added course: ${newCourse.name}`);
+  };
+
+  const deleteCourse = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this course?')) {
+      setCourses(courses.filter(course => course.id !== id));
+      toast.success('Course deleted successfully');
+    }
+  };
+
+  const updateGrade = (courseId: string, grade: string) => {
+    setCourses(courses.map(course => 
+      course.id === courseId ? { ...course, grade } : course
+    ));
+    toast.success(`Grade updated to ${grade}`);
+  };
+
+  const updateProgress = (courseId: string, progress: number) => {
+    setCourses(courses.map(course => 
+      course.id === courseId ? { ...course, progress: Math.min(100, Math.max(0, progress)) } : course
+    ));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -281,6 +406,9 @@ const App: React.FC = () => {
     email: placeholderAnim ? 'john.doe@university.edu' : 'Email Address',
     password: placeholderAnim ? '••••••••' : 'Password'
   };
+
+  // Grade options
+  const gradeOptions = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'Not Graded'];
 
   if (!isAuthenticated) {
     return (
@@ -483,6 +611,11 @@ const App: React.FC = () => {
               <span className={`badge ${currentUser?.role === 'admin' ? 'admin' : 'student'}`}>
                 {currentUser?.role}
               </span>
+              {currentUser?.role === 'student' && (
+                <div style={{ marginTop: '5px', fontSize: '0.8rem' }}>
+                  <FaCalculator /> GPA: {studentStats.currentGPA}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -707,6 +840,118 @@ const App: React.FC = () => {
             </>
           )}
 
+          {/* STUDENT DASHBOARD */}
+          {activeTab === 'dashboard' && currentUser?.role === 'student' && (
+            <>
+              <div className="stats-cards">
+                <div className="stat-card student">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}>
+                    <FaBook />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Total Courses</h3>
+                    <div className="stat-number">{studentStats.totalCourses}</div>
+                    <div className="stat-change">{studentStats.completedCourses} completed</div>
+                  </div>
+                </div>
+
+                <div className="stat-card student">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f093fb, #f5576c)' }}>
+                    <FaCalculator />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Cumulative GPA</h3>
+                    <div className="stat-number">{studentStats.currentGPA}</div>
+                    <div className="stat-change">Out of 4.0</div>
+                  </div>
+                </div>
+
+                <div className="stat-card student">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4facfe, #00f2fe)' }}>
+                    <FaCalendarAlt />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Semester GPA</h3>
+                    <div className="stat-number">{studentStats.semesterGPA}</div>
+                    <div className="stat-change">Fall 2024</div>
+                  </div>
+                </div>
+
+                <div className="stat-card student">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #43e97b, #38f9d7)' }}>
+                    <FaPercent />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Credit Hours</h3>
+                    <div className="stat-number">{studentStats.totalCreditHours}</div>
+                    <div className="stat-change">Current load</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="content-grid">
+                <div className="card student-card">
+                  <div className="card-header">
+                    <h3>Quick Actions</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="quick-actions">
+                      <button 
+                        className="quick-action-btn"
+                        onClick={() => setActiveTab('courses')}
+                      >
+                        <FaPlus /> Add New Course
+                      </button>
+                      <button 
+                        className="quick-action-btn"
+                        onClick={() => setActiveTab('grades')}
+                      >
+                        <FaEdit /> Update Grades
+                      </button>
+                      <button 
+                        className="quick-action-btn"
+                        onClick={() => setActiveTab('profile')}
+                      >
+                        <FaUserCircle /> View Profile
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card student-card">
+                  <div className="card-header">
+                    <h3>Upcoming Deadlines</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="deadlines-list">
+                      <div className="deadline-item">
+                        <div className="deadline-date">Dec 15</div>
+                        <div className="deadline-content">
+                          <h4>Data Structures Final</h4>
+                          <p>CS201 - 10:00 AM</p>
+                        </div>
+                      </div>
+                      <div className="deadline-item">
+                        <div className="deadline-date">Dec 18</div>
+                        <div className="deadline-content">
+                          <h4>Database Project Due</h4>
+                          <p>CS202 - 11:59 PM</p>
+                        </div>
+                      </div>
+                      <div className="deadline-item">
+                        <div className="deadline-date">Dec 20</div>
+                        <div className="deadline-content">
+                          <h4>Web Development Exam</h4>
+                          <p>CS203 - 2:00 PM</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {activeTab === 'users' && currentUser?.role === 'admin' && (
             <div className="card admin-card full-width">
               <div className="card-header">
@@ -802,6 +1047,510 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {/* MY COURSES - Student Section */}
+          {activeTab === 'courses' && currentUser?.role === 'student' && (
+            <div className="card full-width">
+              <div className="card-header">
+                <h3>My Courses ({courses.length})</h3>
+                <button 
+                  className="btn-primary"
+                  onClick={() => setShowCourseModal(true)}
+                >
+                  <FaPlus /> Add New Course
+                </button>
+              </div>
+              <div className="card-body">
+                {/* Add Course Form */}
+                <div className="add-course-form" style={{ 
+                  padding: '20px', 
+                  background: 'var(--gray-light)', 
+                  borderRadius: '10px', 
+                  marginBottom: '20px' 
+                }}>
+                  <h4 style={{ marginBottom: '15px' }}>Add New Course</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Course Name</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g., Data Structures"
+                        value={newCourse.name}
+                        onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
+                        style={{ 
+                          width: '100%', 
+                          padding: '10px', 
+                          border: '2px solid var(--gray)', 
+                          borderRadius: '8px' 
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Course Code</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g., CS201"
+                        value={newCourse.code}
+                        onChange={(e) => setNewCourse({...newCourse, code: e.target.value.toUpperCase()})}
+                        style={{ 
+                          width: '100%', 
+                          padding: '10px', 
+                          border: '2px solid var(--gray)', 
+                          borderRadius: '8px' 
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Credit Hours</label>
+                      <select
+                        value={newCourse.creditHours}
+                        onChange={(e) => setNewCourse({...newCourse, creditHours: parseInt(e.target.value)})}
+                        style={{ 
+                          width: '100%', 
+                          padding: '10px', 
+                          border: '2px solid var(--gray)', 
+                          borderRadius: '8px' 
+                        }}
+                      >
+                        {[1, 2, 3, 4, 5].map(hours => (
+                          <option key={hours} value={hours}>{hours} credit hour{hours > 1 ? 's' : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Semester</label>
+                      <select
+                        value={newCourse.semester}
+                        onChange={(e) => setNewCourse({...newCourse, semester: e.target.value})}
+                        style={{ 
+                          width: '100%', 
+                          padding: '10px', 
+                          border: '2px solid var(--gray)', 
+                          borderRadius: '8px' 
+                        }}
+                      >
+                        {semesters.map(sem => (
+                          <option key={sem} value={sem}>{sem}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={addCourse}
+                    style={{ 
+                      marginTop: '15px', 
+                      padding: '10px 20px', 
+                      background: 'var(--primary)', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer', 
+                      fontWeight: '600' 
+                    }}
+                  >
+                    <FaPlus /> Add Course
+                  </button>
+                </div>
+
+                {/* Courses List */}
+                <div className="courses-list">
+                  {courses.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray)' }}>
+                      <FaBook style={{ fontSize: '3rem', marginBottom: '10px' }} />
+                      <h3>No courses added yet</h3>
+                      <p>Add your first course using the form above</p>
+                    </div>
+                  ) : (
+                    <div className="course-grid">
+                      {courses.map(course => (
+                        <div key={course.id} className="course-card">
+                          <div className="course-card-header">
+                            <div className="course-code">{course.code}</div>
+                            <div className="course-actions">
+                              <button 
+                                className="action-btn"
+                                onClick={() => {
+                                  setSelectedCourseForGrade(course);
+                                  setNewGrade(course.grade);
+                                  setShowGradeModal(true);
+                                }}
+                                title="Update Grade"
+                              >
+                                <FaEdit />
+                              </button>
+                              <button 
+                                className="action-btn delete"
+                                onClick={() => deleteCourse(course.id)}
+                                title="Delete Course"
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="course-card-body">
+                            <h4>{course.name}</h4>
+                            <div className="course-details">
+                              <div className="course-detail">
+                                <FaCalendarAlt /> {course.semester}
+                              </div>
+                              <div className="course-detail">
+                                <FaPercent /> {course.creditHours} Credits
+                              </div>
+                              <div className="course-detail">
+                                <FaTrophy /> Grade: {course.grade}
+                              </div>
+                            </div>
+                            <div style={{ marginTop: '15px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                <span>Progress</span>
+                                <span>{course.progress}%</span>
+                              </div>
+                              <div style={{ 
+                                width: '100%', 
+                                height: '8px', 
+                                background: 'var(--gray-light)', 
+                                borderRadius: '4px' 
+                              }}>
+                                <div style={{ 
+                                  width: `${course.progress}%`, 
+                                  height: '100%', 
+                                  background: 'linear-gradient(135deg, var(--primary), var(--secondary))', 
+                                  borderRadius: '4px' 
+                                }}></div>
+                              </div>
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                marginTop: '10px' 
+                              }}>
+                                <button 
+                                  onClick={() => updateProgress(course.id, course.progress - 10)}
+                                  disabled={course.progress <= 0}
+                                  style={{ 
+                                    padding: '5px 10px', 
+                                    background: 'var(--gray-light)', 
+                                    border: 'none', 
+                                    borderRadius: '4px', 
+                                    cursor: course.progress <= 0 ? 'not-allowed' : 'pointer' 
+                                  }}
+                                >
+                                  <FaMinus />
+                                </button>
+                                <button 
+                                  onClick={() => updateProgress(course.id, course.progress + 10)}
+                                  disabled={course.progress >= 100}
+                                  style={{ 
+                                    padding: '5px 10px', 
+                                    background: 'var(--gray-light)', 
+                                    border: 'none', 
+                                    borderRadius: '4px', 
+                                    cursor: course.progress >= 100 ? 'not-allowed' : 'pointer' 
+                                  }}
+                                >
+                                  <FaPlus />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MY GRADES - Student Section */}
+          {activeTab === 'grades' && currentUser?.role === 'student' && (
+            <div className="card full-width">
+              <div className="card-header">
+                <h3>My Grades & GPA</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div className="gpa-display">
+                    <span style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Current GPA:</span>
+                    <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                      {studentStats.currentGPA}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="card-body">
+                {/* Grade Summary */}
+                <div className="grade-summary" style={{ 
+                  padding: '20px', 
+                  background: 'linear-gradient(135deg, var(--primary), var(--secondary))', 
+                  borderRadius: '10px', 
+                  color: 'white', 
+                  marginBottom: '20px' 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 style={{ margin: 0 }}>Academic Performance</h3>
+                      <p>Based on {courses.length} courses, {studentStats.totalCreditHours} credit hours</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{studentStats.currentGPA}</div>
+                      <div>Out of 4.0</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Grades Table */}
+                <div className="grades-table-container">
+                  <table className="grades-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--gray-light)' }}>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Course</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Code</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Semester</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Credits</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Grade</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Grade Points</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {courses.map(course => {
+                        const gradePoints: { [key: string]: number } = {
+                          'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+                          'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
+                        };
+                        const points = gradePoints[course.grade.toUpperCase()] || 0;
+                        
+                        return (
+                          <tr key={course.id} style={{ borderBottom: '1px solid var(--gray-light)' }}>
+                            <td style={{ padding: '12px' }}>{course.name}</td>
+                            <td style={{ padding: '12px' }}>{course.code}</td>
+                            <td style={{ padding: '12px' }}>{course.semester}</td>
+                            <td style={{ padding: '12px' }}>{course.creditHours}</td>
+                            <td style={{ padding: '12px' }}>
+                              <span className={`grade-badge ${course.grade}`}>
+                                {course.grade}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px' }}>{(points * course.creditHours).toFixed(1)}</td>
+                            <td style={{ padding: '12px' }}>
+                              <select
+                                value={course.grade}
+                                onChange={(e) => updateGrade(course.id, e.target.value)}
+                                style={{ 
+                                  padding: '5px 10px', 
+                                  border: '2px solid var(--gray)', 
+                                  borderRadius: '4px' 
+                                }}
+                              >
+                                {gradeOptions.map(grade => (
+                                  <option key={grade} value={grade}>{grade}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Grade Distribution */}
+                <div className="grade-distribution" style={{ marginTop: '30px' }}>
+                  <h4>Grade Distribution</h4>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    {gradeOptions.slice(0, -1).map(grade => {
+                      const count = courses.filter(c => c.grade === grade).length;
+                      const percentage = courses.length > 0 ? (count / courses.length * 100) : 0;
+                      
+                      return (
+                        <div key={grade} style={{ flex: 1 }}>
+                          <div style={{ 
+                            height: '100px', 
+                            background: 'var(--gray-light)', 
+                            borderRadius: '4px',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{ 
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: `${percentage}%`,
+                              background: 'var(--primary)',
+                              transition: 'height 0.3s ease'
+                            }}></div>
+                          </div>
+                          <div style={{ textAlign: 'center', marginTop: '5px' }}>
+                            <div style={{ fontWeight: 'bold' }}>{grade}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>{count}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MY PROFILE - Student Section */}
+          {activeTab === 'profile' && currentUser?.role === 'student' && (
+            <div className="card full-width">
+              <div className="card-header">
+                <h3>My Profile</h3>
+                <button className="btn-primary">
+                  <FaEdit /> Edit Profile
+                </button>
+              </div>
+              <div className="card-body">
+                <div className="profile-container" style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+                  {/* Profile Info */}
+                  <div className="profile-info" style={{ flex: 1, minWidth: '300px' }}>
+                    <div className="profile-header" style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '20px', 
+                      marginBottom: '30px' 
+                    }}>
+                      <div className="profile-avatar" style={{ 
+                        width: '100px', 
+                        height: '100px', 
+                        borderRadius: '50%', 
+                        background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '2.5rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {currentUser?.firstName[0]}{currentUser?.lastName[0]}
+                      </div>
+                      <div>
+                        <h2 style={{ margin: 0 }}>{currentUser?.firstName} {currentUser?.lastName}</h2>
+                        <p style={{ color: 'var(--gray)', margin: '5px 0' }}>{currentUser?.email}</p>
+                        <span className={`badge student`}>
+                          {currentUser?.role}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Personal Information */}
+                    <div className="info-section">
+                      <h4><FaIdCard /> Personal Information</h4>
+                      <div className="info-grid" style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                        gap: '15px', 
+                        marginTop: '15px' 
+                      }}>
+                        <div className="info-item">
+                          <label>Department</label>
+                          <div className="info-value">{currentUser?.department || 'Computer Science'}</div>
+                        </div>
+                        <div className="info-item">
+                          <label>Level</label>
+                          <div className="info-value">{currentUser?.level || '200 Level'}</div>
+                        </div>
+                        <div className="info-item">
+                          <label>Status</label>
+                          <div className="info-value">
+                            <span className={`status-badge ${currentUser?.status || 'active'}`}>
+                              {currentUser?.status || 'active'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="info-item">
+                          <label>Member Since</label>
+                          <div className="info-value">
+                            {currentUser?.createdAt 
+                              ? new Date(currentUser.createdAt).toLocaleDateString() 
+                              : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Academic Summary */}
+                    <div className="info-section" style={{ marginTop: '30px' }}>
+                      <h4><FaGraduationCap /> Academic Summary</h4>
+                      <div className="academic-stats" style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                        gap: '15px', 
+                        marginTop: '15px' 
+                      }}>
+                        <div className="academic-stat" style={{ 
+                          padding: '15px', 
+                          background: 'var(--gray-light)', 
+                          borderRadius: '8px', 
+                          textAlign: 'center' 
+                        }}>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                            {studentStats.currentGPA}
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Cumulative GPA</div>
+                        </div>
+                        <div className="academic-stat" style={{ 
+                          padding: '15px', 
+                          background: 'var(--gray-light)', 
+                          borderRadius: '8px', 
+                          textAlign: 'center' 
+                        }}>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                            {studentStats.totalCourses}
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Total Courses</div>
+                        </div>
+                        <div className="academic-stat" style={{ 
+                          padding: '15px', 
+                          background: 'var(--gray-light)', 
+                          borderRadius: '8px', 
+                          textAlign: 'center' 
+                        }}>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                            {studentStats.totalCreditHours}
+                          </div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Credit Hours</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Activity */}
+                  <div className="profile-activity" style={{ flex: 1, minWidth: '300px' }}>
+                    <h4><FaHistory /> Recent Activity</h4>
+                    <div className="activity-timeline" style={{ marginTop: '15px' }}>
+                      {[
+                        { action: 'Updated grade for Data Structures', time: '2 hours ago' },
+                        { action: 'Added new course: Web Development', time: '1 day ago' },
+                        { action: 'Updated profile information', time: '3 days ago' },
+                        { action: 'Logged in to portal', time: '1 week ago' },
+                      ].map((activity, index) => (
+                        <div key={index} className="timeline-item" style={{ 
+                          padding: '10px 0', 
+                          borderBottom: '1px solid var(--gray-light)',
+                          display: 'flex',
+                          gap: '10px'
+                        }}>
+                          <div style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            background: 'var(--primary)', 
+                            borderRadius: '50%',
+                            marginTop: '5px'
+                          }}></div>
+                          <div>
+                            <div>{activity.action}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>{activity.time}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'analytics' && currentUser?.role === 'admin' && (
             <div className="content-grid">
               <div className="card admin-card full-width">
@@ -844,41 +1593,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'courses' && currentUser?.role === 'student' && (
-            <div className="content-grid">
-              <div className="card full-width">
-                <div className="card-header">
-                  <h3>My Computer Science Courses</h3>
-                </div>
-                <div className="card-body">
-                  <div className="course-list">
-                    {[
-                      { title: 'Data Structures & Algorithms', code: 'CS301', progress: 75 },
-                      { title: 'Database Management', code: 'CS302', progress: 60 },
-                      { title: 'Web Development', code: 'CS303', progress: 90 },
-                    ].map((course) => (
-                      <div key={course.code} className="course-item">
-                        <div className="course-icon">
-                          <FaBook />
-                        </div>
-                        <div className="course-info" style={{ flex: 1 }}>
-                          <h4>{course.title}</h4>
-                          <p>{course.code}</p>
-                          <div style={{ width: '100%', height: '8px', background: 'var(--gray-light)', borderRadius: '4px', marginTop: '10px' }}>
-                            <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', borderRadius: '4px' }}></div>
-                          </div>
-                        </div>
-                        <div className="course-status">
-                          <span className="status active">{course.progress}%</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'settings' && (
             <div className="card full-width">
               <div className="card-header">
@@ -902,6 +1616,89 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Grade Update Modal */}
+      {showGradeModal && selectedCourseForGrade && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? 'white' : 'black',
+            borderRadius: 'var(--border-radius)',
+            padding: '30px',
+            width: '400px',
+            maxWidth: '90%'
+          }}>
+            <h2 style={{ marginBottom: '20px' }}>Update Grade</h2>
+            <div style={{ marginBottom: '20px' }}>
+              <p><strong>Course:</strong> {selectedCourseForGrade.name} ({selectedCourseForGrade.code})</p>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Select Grade</label>
+              <select
+                value={newGrade}
+                onChange={(e) => setNewGrade(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '2px solid var(--gray-light)', 
+                  borderRadius: '8px',
+                  background: darkMode ? '#374151' : 'white',
+                  color: darkMode ? 'white' : 'black'
+                }}
+              >
+                {gradeOptions.map(grade => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button 
+                onClick={() => {
+                  updateGrade(selectedCourseForGrade.id, newGrade);
+                  setShowGradeModal(false);
+                  setSelectedCourseForGrade(null);
+                }}
+                style={{ 
+                  flex: 1, padding: '12px', 
+                  background: 'var(--primary)', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  cursor: 'pointer', 
+                  fontWeight: '600' 
+                }}
+              >
+                Update Grade
+              </button>
+              <button 
+                onClick={() => { 
+                  setShowGradeModal(false); 
+                  setSelectedCourseForGrade(null);
+                }}
+                style={{ 
+                  flex: 1, padding: '12px', 
+                  background: 'var(--gray)', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  cursor: 'pointer', 
+                  fontWeight: '600' 
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEditModal && editingUser && (
         <div style={{

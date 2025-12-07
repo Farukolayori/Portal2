@@ -1,10 +1,14 @@
-// frontend/src/api.ts - ULTIMATE VERSION
+// frontend/src/api.ts
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// Detect if backend is waking up from cold start
+let isBackendWaking = false;
+let wakeupToastId: string | number | null = null;
+
 const API = axios.create({
   baseURL: 'https://userbackend-slns.onrender.com/api',
-  timeout: 90000, // 90 seconds — REQUIRED for Render free tier
+  timeout: 120000, // Increased to 120 seconds for cold starts
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -18,53 +22,118 @@ API.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Show wakeup notification for first request after idle
+    if (!isBackendWaking && (config.url?.includes('/auth/login') || config.url?.includes('/auth/register'))) {
+      isBackendWaking = true;
+      wakeupToastId = toast.info(
+        '🚀 Backend server is waking up... This may take 20-40 seconds on free hosting',
+        {
+          autoClose: false,
+          closeButton: false,
+          isLoading: true,
+          toastId: 'wakeup-toast'
+        }
+      );
+    }
+    
     console.log('Request →', config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor with toast + smart Render handling
+// Response interceptor
 API.interceptors.response.use(
   (response) => {
-    // Optional: toast.success('Data loaded successfully');
+    // Clear wakeup notification when request succeeds
+    if (wakeupToastId) {
+      toast.dismiss(wakeupToastId);
+      wakeupToastId = null;
+    }
+    isBackendWaking = false;
     return response;
   },
   (error) => {
+    // Clear wakeup notification on any response
+    if (wakeupToastId) {
+      toast.dismiss(wakeupToastId);
+      wakeupToastId = null;
+    }
+    
     const url = error.config?.url;
     const status = error.response?.status;
+    const method = error.config?.method?.toUpperCase();
 
-    // Render Free Tier Cold Start
+    console.error('API Error:', {
+      url,
+      method,
+      status,
+      error: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+
+    // Handle timeout/cold start specifically
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      toast.warn('Backend is waking up (free hosting)... Please wait 20-40 seconds', {
-        autoClose: 8000,
-        toastId: 'render-wakeup'
-      });
+      toast.error(
+        '⏱️ Backend is taking longer than usual to respond. This is normal for free hosting. Please wait and try again in 30 seconds.',
+        { autoClose: 10000 }
+      );
       return Promise.reject(error);
     }
 
-    // Server down / deploying
-    if (status >= 500 || status === 502 || status === 503 || status === 404) {
-      toast.error('Server is currently unavailable. Please try again in a minute.', {
-        toastId: 'server-down'
-      });
+    // Server errors (likely cold start)
+    if (!error.response) {
+      toast.error(
+        '🌐 Backend server is starting up. Please wait 30 seconds and try again.',
+        { autoClose: 8000 }
+      );
       return Promise.reject(error);
     }
 
-    // Unauthorized - auto logout
-    if (status === 401) {
-      localStorage.removeItem('token');
-      toast.error('Session expired. Please login again.');
-      setTimeout(() => window.location.reload(), 2000);
-      return Promise.reject(error);
+    // Specific status code handling
+    switch (status) {
+      case 401:
+        localStorage.removeItem('token');
+        toast.error('Session expired. Please login again.');
+        setTimeout(() => window.location.reload(), 2000);
+        break;
+      case 404:
+        toast.error('API endpoint not found. Please check backend deployment.');
+        break;
+      case 500:
+      case 502:
+      case 503:
+        toast.error('Server error. Backend might be deploying or restarting.');
+        break;
+      default:
+        const message = error.response?.data?.message || 'Request failed';
+        toast.error(`❌ ${message}`);
     }
-
-    // Client errors (400, 403, etc)
-    const message = error.response?.data?.message || error.message || 'Request failed';
-    toast.error(message);
 
     return Promise.reject(error);
   }
 );
+
+// Function to test backend connectivity
+export const testBackendConnection = async () => {
+  try {
+    const response = await axios.get('https://userbackend-slns.onrender.com/health', {
+      timeout: 30000
+    });
+    return { 
+      status: 'online', 
+      data: response.data,
+      responseTime: response.headers['x-response-time']
+    };
+  } catch (error: any) {
+    return { 
+      status: 'offline', 
+      error: error.message,
+      code: error.code
+    };
+  }
+};
 
 export default API;
