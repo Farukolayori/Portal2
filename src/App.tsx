@@ -97,14 +97,58 @@ const App: React.FC = () => {
   const [selectedCourseForGrade, setSelectedCourseForGrade] = useState<Course | null>(null);
   const [newGrade, setNewGrade] = useState('');
 
+  // Admin states
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
   useEffect(() => {
-    // Only keep dark mode preference
+    // Check for dark mode preference
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) setDarkMode(JSON.parse(savedDarkMode));
     
-    // REMOVED: Auto-login functionality
-    // No checking for saved token or auto-login
+    // Check for auto-login token
+    const savedToken = localStorage.getItem('token');
+    if (savedToken && !isAuthenticated) {
+      setLoading(true);
+      API.get('/auth/user')
+        .then((res) => {
+          // TEMPORARY FIX: Check for admin email
+          let userData = res.data;
+          if (userData.email.toLowerCase() === 'diamond@gmail.com') {
+            userData.role = 'admin';
+            userData.firstName = 'Pelumi';
+            userData.lastName = 'Ariyo';
+          }
+          
+          setCurrentUser(userData);
+          setIsAuthenticated(true);
+          
+          // Load admin data if admin
+          if (userData.role === 'admin') {
+            loadAdminData();
+          }
+          
+          toast.success(`Welcome back${userData.role === 'admin' ? ' Admin' : ''}!`);
+        })
+        .catch((err) => {
+          console.error('Auto-login error:', err);
+          localStorage.removeItem('token');
+          toast.error('Session expired. Please login again');
+        })
+        .finally(() => setLoading(false));
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && currentUser?.role === 'admin') {
+      loadAdminData();
+    }
+  }, [isAuthenticated, currentUser?.role, searchTerm, filterRole, filterStatus]);
 
   // Calculate GPA
   const calculateGPA = () => {
@@ -137,6 +181,83 @@ const App: React.FC = () => {
     favoriteCourses: courses.filter(c => c.isFavorite).length,
   };
 
+  // Admin stats
+  const adminStats = {
+    total: allUsers.length,
+    active: allUsers.filter(u => u.status === 'active').length,
+    students: allUsers.filter(u => u.role === 'student').length,
+    admins: allUsers.filter(u => u.role === 'admin').length,
+  };
+
+  const loadAdminData = async () => {
+    setLoadingUsers(true);
+    try {
+      // Since we don't have a backend, we'll simulate admin data
+      // In a real app, you would fetch from API
+      const simulatedUsers: User[] = [
+        {
+          _id: '1',
+          firstName: 'Pelumi',
+          lastName: 'Ariyo',
+          email: 'diamond@gmail.com',
+          department: 'Computer Science',
+          role: 'admin',
+          status: 'active',
+          level: '500',
+          cgpa: '5.0'
+        },
+        {
+          _id: '2',
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john@example.com',
+          department: 'Computer Science',
+          role: 'student',
+          status: 'active',
+          level: '100',
+          cgpa: '3.5'
+        },
+        {
+          _id: '3',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          email: 'jane@example.com',
+          department: 'Information Technology',
+          role: 'student',
+          status: 'active',
+          level: '200',
+          cgpa: '3.8'
+        }
+      ];
+      
+      // Filter based on search and filters
+      let filteredUsers = simulatedUsers;
+      
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        filteredUsers = filteredUsers.filter(u => 
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(search) ||
+          u.email.toLowerCase().includes(search)
+        );
+      }
+      
+      if (filterRole !== 'all') {
+        filteredUsers = filteredUsers.filter(u => u.role === filterRole);
+      }
+      
+      if (filterStatus !== 'all') {
+        filteredUsers = filteredUsers.filter(u => u.status === filterStatus);
+      }
+      
+      setAllUsers(filteredUsers);
+    } catch (err) {
+      console.error('Failed to load admin data:', err);
+      toast.error('Failed to load admin data');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -148,9 +269,24 @@ const App: React.FC = () => {
           password: formData.password
         });
         localStorage.setItem('token', res.data.token);
-        setCurrentUser(res.data.user);
+        
+        // TEMPORARY FIX: Check for admin email and override role
+        let userData = res.data.user;
+        if (formData.email.toLowerCase() === 'diamond@gmail.com') {
+          userData.role = 'admin';
+          userData.firstName = 'Pelumi';
+          userData.lastName = 'Ariyo';
+        }
+        
+        setCurrentUser(userData);
         setIsAuthenticated(true);
-        toast.success('🎉 Welcome back! Login successful');
+        
+        // Load admin data if admin
+        if (userData.role === 'admin') {
+          loadAdminData();
+        }
+        
+        toast.success(userData.role === 'admin' ? '👋 Welcome Admin!' : '🎉 Welcome back! Login successful');
       } else {
         // Simplified registration - only essential fields
         const registrationData = {
@@ -169,7 +305,48 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error:', err);
-      toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please try again.'}`);
+      
+      // If backend fails, simulate login for testing
+      if (formData.email.toLowerCase() === 'diamond@gmail.com' && formData.password === 'Olayori25') {
+        // Simulate admin login
+        const simulatedAdmin: User = {
+          _id: 'admin-1',
+          firstName: 'Pelumi',
+          lastName: 'Ariyo',
+          email: 'diamond@gmail.com',
+          department: 'Computer Science',
+          role: 'admin',
+          status: 'active',
+          level: '500',
+          cgpa: '5.0'
+        };
+        
+        localStorage.setItem('token', 'simulated-token-' + Date.now());
+        setCurrentUser(simulatedAdmin);
+        setIsAuthenticated(true);
+        loadAdminData();
+        toast.success('👋 Welcome Admin! (Simulated Login)');
+      } else if (isLogin) {
+        // For other logins, simulate student
+        const simulatedStudent: User = {
+          _id: 'student-' + Date.now(),
+          firstName: 'Test',
+          lastName: 'Student',
+          email: formData.email,
+          department: 'Computer Science',
+          role: 'student',
+          status: 'active',
+          level: '100',
+          cgpa: '0.00'
+        };
+        
+        localStorage.setItem('token', 'simulated-token-' + Date.now());
+        setCurrentUser(simulatedStudent);
+        setIsAuthenticated(true);
+        toast.success('🎉 Welcome! (Simulated Login)');
+      } else {
+        toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please try again.'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -267,6 +444,65 @@ const App: React.FC = () => {
     }
   };
 
+  // Admin functions
+  const handleDeleteUser = async (id: string) => {
+    if (window.confirm('⚠️ Are you sure you want to delete this user?')) {
+      try {
+        // Simulate delete
+        setAllUsers(allUsers.filter(u => u._id !== id));
+        toast.success('✅ User deleted successfully');
+        loadAdminData();
+      } catch (err: any) {
+        console.error('Delete error:', err);
+        toast.error('Delete failed');
+      }
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser({ ...user });
+    setShowEditModal(true);
+  };
+
+  const saveEdit = async () => {
+    if (editingUser) {
+      try {
+        // Simulate update
+        setAllUsers(allUsers.map(u => u._id === editingUser._id ? editingUser : u));
+        toast.success('✅ User updated successfully');
+        setShowEditModal(false);
+        setEditingUser(null);
+        loadAdminData();
+      } catch (err: any) {
+        console.error('Update error:', err);
+        toast.error('Update failed');
+      }
+    }
+  };
+
+  const exportUsers = async () => {
+    try {
+      const csvContent = "data:text/csv;charset=utf-8," 
+        + "ID,First Name,Last Name,Email,Role,Department,Status\n"
+        + allUsers.map(user => 
+            `${user._id},${user.firstName},${user.lastName},${user.email},${user.role},${user.department},${user.status}`
+          ).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "users.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('✅ Data exported successfully');
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error('Export failed');
+    }
+  };
+
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
@@ -280,6 +516,7 @@ const App: React.FC = () => {
       setIsAuthenticated(false);
       setCurrentUser(null);
       setCourses([]);
+      setAllUsers([]);
       toast.info('👋 Logged out successfully');
     }
   };
@@ -315,10 +552,25 @@ const App: React.FC = () => {
             <div className="logo-section">
               <div className="logo pulse">
                 <FaGraduationCap />
-                <span>Student Portal</span>
+                <span>Academic Portal</span>
               </div>
               <h1>{isLogin ? 'Welcome Back!' : 'Create Account'}</h1>
-              <p>Student Academic Portal</p>
+              <p>Student & Admin Portal</p>
+              
+              {/* Admin login hint */}
+              <div style={{ 
+                marginTop: '15px', 
+                padding: '10px', 
+                background: 'rgba(67, 97, 238, 0.1)', 
+                borderRadius: '8px',
+                fontSize: '0.9rem'
+              }}>
+                <p style={{ margin: 0 }}>
+                  <strong>Admin Test Credentials:</strong><br/>
+                  📧 diamond@gmail.com<br/>
+                  🔑 Olayori25
+                </p>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
@@ -505,21 +757,23 @@ const App: React.FC = () => {
         theme={darkMode ? 'dark' : 'light'}
       />
       
-      <div className="sidebar">
+      <div className={`sidebar ${currentUser?.role === 'admin' ? 'admin-sidebar' : ''}`}>
         <div className="sidebar-header">
           <div className="user-profile">
             <div className="avatar">
-              {currentUser?.firstName?.[0] || 'S'}
+              {currentUser?.firstName?.[0] || 'U'}
             </div>
             <div className="user-info">
               <h3>{currentUser?.firstName} {currentUser?.lastName}</h3>
               <p>{currentUser?.email}</p>
-              <span className="badge student">
-                Student
+              <span className={`badge ${currentUser?.role === 'admin' ? 'admin' : 'student'}`}>
+                {currentUser?.role}
               </span>
-              <div style={{ marginTop: '5px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <FaCalculator /> GPA: {studentStats.currentGPA}
-              </div>
+              {currentUser?.role === 'student' && (
+                <div style={{ marginTop: '5px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <FaCalculator /> GPA: {studentStats.currentGPA}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -532,20 +786,45 @@ const App: React.FC = () => {
           >
             <FaHome /> Dashboard
           </a>
-          <a 
-            href="#" 
-            className={activeTab === 'courses' ? 'active' : ''}
-            onClick={(e) => { e.preventDefault(); setActiveTab('courses'); }}
-          >
-            <FaBookOpen /> My Courses
-          </a>
-          <a 
-            href="#" 
-            className={activeTab === 'grades' ? 'active' : ''}
-            onClick={(e) => { e.preventDefault(); setActiveTab('grades'); }}
-          >
-            <FaTrophy /> My Grades
-          </a>
+          
+          {currentUser?.role === 'admin' && (
+            <>
+              <a 
+                href="#" 
+                className={activeTab === 'users' ? 'active' : ''}
+                onClick={(e) => { e.preventDefault(); setActiveTab('users'); }}
+              >
+                <FaUsers /> User Management
+              </a>
+              <a 
+                href="#" 
+                className={activeTab === 'analytics' ? 'active' : ''}
+                onClick={(e) => { e.preventDefault(); setActiveTab('analytics'); }}
+              >
+                <FaChartBar /> Analytics
+              </a>
+            </>
+          )}
+          
+          {currentUser?.role === 'student' && (
+            <>
+              <a 
+                href="#" 
+                className={activeTab === 'courses' ? 'active' : ''}
+                onClick={(e) => { e.preventDefault(); setActiveTab('courses'); }}
+              >
+                <FaBookOpen /> My Courses
+              </a>
+              <a 
+                href="#" 
+                className={activeTab === 'grades' ? 'active' : ''}
+                onClick={(e) => { e.preventDefault(); setActiveTab('grades'); }}
+              >
+                <FaTrophy /> My Grades
+              </a>
+            </>
+          )}
+          
           <a 
             href="#" 
             className={activeTab === 'settings' ? 'active' : ''}
@@ -586,12 +865,14 @@ const App: React.FC = () => {
         <div className="header">
           <div className="header-left">
             <h1>
-              {activeTab === 'dashboard' && 'Student Dashboard'}
+              {activeTab === 'dashboard' && (currentUser?.role === 'admin' ? 'Admin Dashboard' : 'Student Dashboard')}
+              {activeTab === 'users' && 'User Management'}
+              {activeTab === 'analytics' && 'Analytics'}
+              {activeTab === 'settings' && 'Settings'}
               {activeTab === 'courses' && 'My Courses'}
               {activeTab === 'grades' && 'My Grades'}
-              {activeTab === 'settings' && 'Settings'}
             </h1>
-            <p>Student Academic Portal</p>
+            <p>{currentUser?.role === 'admin' ? 'Admin Portal' : 'Student Academic Portal'}</p>
           </div>
           <div className="header-right">
             <div className="notifications">
@@ -602,8 +883,116 @@ const App: React.FC = () => {
         </div>
 
         <div className="content">
+          {/* ADMIN DASHBOARD */}
+          {activeTab === 'dashboard' && currentUser?.role === 'admin' && (
+            <>
+              <div className="stats-cards">
+                <div className="stat-card admin">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}>
+                    <FaUsers />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Total Users</h3>
+                    <div className="stat-number">{adminStats.total}</div>
+                    <div className="stat-change">{adminStats.active} active</div>
+                  </div>
+                </div>
+
+                <div className="stat-card admin">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f093fb, #f5576c)' }}>
+                    <FaUserGraduate />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Students</h3>
+                    <div className="stat-number">{adminStats.students}</div>
+                    <div className="stat-change">{adminStats.active} active</div>
+                  </div>
+                </div>
+
+                <div className="stat-card admin">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4facfe, #00f2fe)' }}>
+                    <FaUserShield />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Admins</h3>
+                    <div className="stat-number">{adminStats.admins}</div>
+                    <div className="stat-change">System administrators</div>
+                  </div>
+                </div>
+
+                <div className="stat-card admin">
+                  <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #43e97b, #38f9d7)' }}>
+                    <FaCheckCircle />
+                  </div>
+                  <div className="stat-info">
+                    <h3>Active Users</h3>
+                    <div className="stat-number">{adminStats.active}</div>
+                    <div className="stat-change">{Math.round((adminStats.active / adminStats.total) * 100)}% of total</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="content-grid">
+                <div className="card admin-card">
+                  <div className="card-header">
+                    <h3>System Overview</h3>
+                  </div>
+                  <div className="card-body">
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                      <FaChartPie style={{ fontSize: '4rem', color: 'var(--primary)', marginBottom: '1rem', opacity: 0.7 }} />
+                      <h3 style={{ marginBottom: '10px' }}>Welcome, {currentUser?.firstName}!</h3>
+                      <p style={{ color: 'var(--gray)' }}>You are logged in as an administrator</p>
+                      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <button 
+                          className="btn-primary"
+                          onClick={() => setActiveTab('users')}
+                        >
+                          <FaUsers /> Manage Users
+                        </button>
+                        <button 
+                          className="btn-secondary"
+                          onClick={() => setActiveTab('analytics')}
+                        >
+                          <FaChartBar /> View Analytics
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card admin-card">
+                  <div className="card-header">
+                    <h3>Quick Actions</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="quick-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <button 
+                        className="quick-action-btn"
+                        onClick={() => setActiveTab('users')}
+                      >
+                        <FaUsers /> View All Users
+                      </button>
+                      <button 
+                        className="quick-action-btn"
+                        onClick={exportUsers}
+                      >
+                        <FaFileExport /> Export Data
+                      </button>
+                      <button 
+                        className="quick-action-btn"
+                        onClick={() => setActiveTab('settings')}
+                      >
+                        <FaCog /> System Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* STUDENT DASHBOARD */}
-          {activeTab === 'dashboard' && (
+          {activeTab === 'dashboard' && currentUser?.role === 'student' && (
             <>
               <div className="stats-cards">
                 <div className="stat-card student">
@@ -702,8 +1091,145 @@ const App: React.FC = () => {
             </>
           )}
 
-          {/* MY COURSES */}
-          {activeTab === 'courses' && (
+          {/* ADMIN USER MANAGEMENT */}
+          {activeTab === 'users' && currentUser?.role === 'admin' && (
+            <div className="card admin-card full-width">
+              <div className="card-header">
+                <h3>User Management ({allUsers.length})</h3>
+                <div className="admin-actions">
+                  <button className="btn-primary" onClick={exportUsers}>
+                    <FaFileExport /> Export Data
+                  </button>
+                </div>
+              </div>
+              <div className="card-body">
+                <div className="table-controls">
+                  <div className="search-bar">
+                    <FaSearch />
+                    <input
+                      type="text"
+                      placeholder="Search users..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+                    <option value="all">All Roles</option>
+                    <option value="student">Students</option>
+                    <option value="admin">Admins</option>
+                  </select>
+                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="table-container">
+                  {loadingUsers ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                      <FaSpinner className="spinner" style={{ fontSize: '3rem' }} />
+                    </div>
+                  ) : (
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>User</th>
+                          <th>Email</th>
+                          <th>Department</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allUsers.map(user => (
+                          <tr key={user._id}>
+                            <td>
+                              <div className="user-cell">
+                                <div className="user-avatar">
+                                  {user.firstName[0]}
+                                </div>
+                                <div>
+                                  <strong>{user.firstName} {user.lastName}</strong>
+                                  <br />
+                                  <small>Level: {user.level || 'N/A'}</small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{user.email}</td>
+                            <td>{user.department}</td>
+                            <td>
+                              <span className={`role-badge ${user.role}`}>
+                                {user.role}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-badge ${user.status}`}>
+                                {user.status}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="action-buttons">
+                                <button className="action-btn edit" onClick={() => handleEditUser(user)} title="Edit">
+                                  <FaEdit />
+                                </button>
+                                <button className="action-btn delete" onClick={() => handleDeleteUser(user._id)} title="Delete">
+                                  <FaTrash />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN ANALYTICS */}
+          {activeTab === 'analytics' && currentUser?.role === 'admin' && (
+            <div className="content-grid">
+              <div className="card admin-card full-width">
+                <div className="card-header">
+                  <h3>System Analytics</h3>
+                </div>
+                <div className="card-body">
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <FaChartLine style={{ fontSize: '4rem', color: 'var(--primary)', marginBottom: '1rem', opacity: 0.7 }} />
+                    <h3 style={{ marginBottom: '10px' }}>Analytics Dashboard</h3>
+                    <p style={{ color: 'var(--gray)', marginBottom: '30px' }}>
+                      View system statistics and user analytics
+                    </p>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '30px' }}>
+                      <div className="stat-card mini">
+                        <div className="stat-number">{adminStats.total}</div>
+                        <div className="stat-label">Total Users</div>
+                      </div>
+                      <div className="stat-card mini">
+                        <div className="stat-number">{adminStats.students}</div>
+                        <div className="stat-label">Students</div>
+                      </div>
+                      <div className="stat-card mini">
+                        <div className="stat-number">{adminStats.admins}</div>
+                        <div className="stat-label">Admins</div>
+                      </div>
+                      <div className="stat-card mini">
+                        <div className="stat-number">{adminStats.active}</div>
+                        <div className="stat-label">Active</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MY COURSES - Student Only */}
+          {activeTab === 'courses' && currentUser?.role === 'student' && (
             <div className="card full-width">
               <div className="card-header">
                 <h3>My Courses ({courses.length})</h3>
@@ -993,8 +1519,8 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* MY GRADES */}
-          {activeTab === 'grades' && (
+          {/* MY GRADES - Student Only */}
+          {activeTab === 'grades' && currentUser?.role === 'student' && (
             <div className="card full-width">
               <div className="card-header">
                 <h3>My Grades & Academic Performance</h3>
@@ -1146,6 +1672,7 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {/* SETTINGS - Both Admin and Student */}
           {activeTab === 'settings' && (
             <div className="card full-width">
               <div className="card-header">
@@ -1159,8 +1686,44 @@ const App: React.FC = () => {
                       {darkMode ? <><FaSun /> Switch to Light Mode</> : <><FaMoon /> Switch to Dark Mode</>}
                     </button>
                   </div>
+                  
                   <div>
-                    <h3>Account</h3>
+                    <h3>Account Information</h3>
+                    <div style={{ 
+                      padding: '15px', 
+                      background: 'var(--gray-light)', 
+                      borderRadius: 'var(--border-radius)',
+                      marginTop: '10px'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Name</div>
+                          <div style={{ fontWeight: 'bold' }}>{currentUser?.firstName} {currentUser?.lastName}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Email</div>
+                          <div style={{ fontWeight: 'bold' }}>{currentUser?.email}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Role</div>
+                          <div style={{ fontWeight: 'bold' }}>
+                            <span className={`badge ${currentUser?.role === 'admin' ? 'admin' : 'student'}`}>
+                              {currentUser?.role}
+                            </span>
+                          </div>
+                        </div>
+                        {currentUser?.role === 'student' && (
+                          <div>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Current GPA</div>
+                            <div style={{ fontWeight: 'bold' }}>{studentStats.currentGPA}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3>System</h3>
                     <p style={{ color: 'var(--gray)' }}>Manage your account settings and preferences</p>
                   </div>
                 </div>
@@ -1248,6 +1811,141 @@ const App: React.FC = () => {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? 'white' : 'black',
+            borderRadius: 'var(--border-radius)',
+            padding: '30px',
+            width: '500px',
+            maxWidth: '90%'
+          }}>
+            <h2 style={{ marginBottom: '20px' }}>Edit User</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>First Name</label>
+                <input 
+                  type="text"
+                  value={editingUser.firstName}
+                  onChange={(e) => setEditingUser({...editingUser, firstName: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Last Name</label>
+                <input 
+                  type="text"
+                  value={editingUser.lastName}
+                  onChange={(e) => setEditingUser({...editingUser, lastName: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Email</label>
+                <input 
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Role</label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                >
+                  <option value="student">Student</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Status</label>
+                <select
+                  value={editingUser.status || 'active'}
+                  onChange={(e) => setEditingUser({...editingUser, status: e.target.value})}
+                  style={{ 
+                    width: '100%', padding: '10px', 
+                    border: '2px solid var(--gray-light)', 
+                    borderRadius: '8px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : 'black'
+                  }}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  onClick={saveEdit}
+                  style={{ 
+                    flex: 1, padding: '12px', 
+                    background: 'var(--primary)', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer', 
+                    fontWeight: '600' 
+                  }}
+                >
+                  Save Changes
+                </button>
+                <button 
+                  onClick={() => { setShowEditModal(false); setEditingUser(null); }}
+                  style={{ 
+                    flex: 1, padding: '12px', 
+                    background: 'var(--gray)', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer', 
+                    fontWeight: '600' 
+                }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
