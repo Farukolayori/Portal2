@@ -86,7 +86,7 @@ API.interceptors.response.use(
     // Server errors (likely cold start)
     if (!error.response) {
       toast.error(
-        '🌐 Backend server is starting up. Please wait 30 seconds and try again.',
+        'Please Wait a Minute.',
         { autoClose: 8000 }
       );
       return Promise.reject(error);
