@@ -27,7 +27,7 @@ API.interceptors.request.use(
     if (!isBackendWaking && (config.url?.includes('/auth/login') || config.url?.includes('/auth/register'))) {
       isBackendWaking = true;
       wakeupToastId = toast.info(
-        '🚀 Backend server is waking up... This may take 20-40 seconds on free hosting',
+        'Please Wait a Minute.',
         {
           autoClose: false,
           closeButton: false,
