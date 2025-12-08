@@ -98,25 +98,12 @@ const App: React.FC = () => {
   const [newGrade, setNewGrade] = useState('');
 
   useEffect(() => {
+    // Only keep dark mode preference
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) setDarkMode(JSON.parse(savedDarkMode));
-
-    const savedToken = localStorage.getItem('token');
-    if (savedToken && !isAuthenticated) {
-      setLoading(true);
-      API.get('/auth/user')
-        .then((res) => {
-          setCurrentUser(res.data);
-          setIsAuthenticated(true);
-          toast.success('Welcome back! Auto-login successful');
-        })
-        .catch((err) => {
-          console.error('Auto-login error:', err);
-          localStorage.removeItem('token');
-          toast.error('Session expired. Please login again');
-        })
-        .finally(() => setLoading(false));
-    }
+    
+    // REMOVED: Auto-login functionality
+    // No checking for saved token or auto-login
   }, []);
 
   // Calculate GPA
