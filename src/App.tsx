@@ -203,31 +203,9 @@ const App: React.FC = () => {
           department: 'Computer Science',
           role: 'admin',
           status: 'active',
-          level: '500',
-          cgpa: '5.0'
+          
         },
-        {
-          _id: '2',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john@example.com',
-          department: 'Computer Science',
-          role: 'student',
-          status: 'active',
-          level: '100',
-          cgpa: '3.5'
-        },
-        {
-          _id: '3',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          email: 'jane@example.com',
-          department: 'Information Technology',
-          role: 'student',
-          status: 'active',
-          level: '200',
-          cgpa: '3.8'
-        }
+        
       ];
       
       // Filter based on search and filters
@@ -557,20 +535,7 @@ const App: React.FC = () => {
               <h1>{isLogin ? 'Welcome Back!' : 'Create Account'}</h1>
               <p>Student & Admin Portal</p>
               
-              {/* Admin login hint */}
-              <div style={{ 
-                marginTop: '15px', 
-                padding: '10px', 
-                background: 'rgba(67, 97, 238, 0.1)', 
-                borderRadius: '8px',
-                fontSize: '0.9rem'
-              }}>
-                <p style={{ margin: 0 }}>
-                  <strong>Admin Test Credentials:</strong><br/>
-                  📧 diamond@gmail.com<br/>
-                  🔑 Olayori25
-                </p>
-              </div>
+           
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
