@@ -111,37 +111,8 @@ const App: React.FC = () => {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) setDarkMode(JSON.parse(savedDarkMode));
     
-    // Check for auto-login token
-    const savedToken = localStorage.getItem('token');
-    if (savedToken && !isAuthenticated) {
-      setLoading(true);
-      API.get('/auth/user')
-        .then((res) => {
-          // TEMPORARY FIX: Check for admin email
-          let userData = res.data;
-          if (userData.email.toLowerCase() === 'diamond@gmail.com') {
-            userData.role = 'admin';
-            userData.firstName = 'Pelumi';
-            userData.lastName = 'Ariyo';
-          }
-          
-          setCurrentUser(userData);
-          setIsAuthenticated(true);
-          
-          // Load admin data if admin
-          if (userData.role === 'admin') {
-            loadAdminData();
-          }
-          
-          toast.success(`Welcome back${userData.role === 'admin' ? ' Admin' : ''}!`);
-        })
-        .catch((err) => {
-          console.error('Auto-login error:', err);
-          localStorage.removeItem('token');
-          toast.error('Session expired. Please login again');
-        })
-        .finally(() => setLoading(false));
-    }
+    // Auto-login disabled: do not automatically authenticate using stored token.
+    // If you want to re-enable auto-login later, restore the token check + API.get('/auth/user') logic here.
   }, []);
 
   useEffect(() => {
