@@ -163,42 +163,28 @@ const App: React.FC = () => {
   const loadAdminData = async () => {
     setLoadingUsers(true);
     try {
-      // Since we don't have a backend, we'll simulate admin data
-      // In a real app, you would fetch from API
-      const simulatedUsers: User[] = [
-        {
-          _id: '1',
-          firstName: 'Pelumi',
-          lastName: 'Ariyo',
-          email: 'diamond@gmail.com',
-          department: 'Computer Science',
-          role: 'admin',
-          status: 'active',
-          
-        },
-        
-      ];
+      // Fetch real admin data from backend
+      const res = await API.get('/admin/users');
+      let users = res.data;
       
       // Filter based on search and filters
-      let filteredUsers = simulatedUsers;
-      
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        filteredUsers = filteredUsers.filter(u => 
+        users = users.filter((u: User) => 
           `${u.firstName} ${u.lastName}`.toLowerCase().includes(search) ||
           u.email.toLowerCase().includes(search)
         );
       }
       
       if (filterRole !== 'all') {
-        filteredUsers = filteredUsers.filter(u => u.role === filterRole);
+        users = users.filter((u: User) => u.role === filterRole);
       }
       
       if (filterStatus !== 'all') {
-        filteredUsers = filteredUsers.filter(u => u.status === filterStatus);
+        users = users.filter((u: User) => u.status === filterStatus);
       }
       
-      setAllUsers(filteredUsers);
+      setAllUsers(users);
     } catch (err) {
       console.error('Failed to load admin data:', err);
       toast.error('Failed to load admin data');
@@ -219,14 +205,7 @@ const App: React.FC = () => {
         });
         localStorage.setItem('token', res.data.token);
         
-        // TEMPORARY FIX: Check for admin email and override role
-        let userData = res.data.user;
-        if (formData.email.toLowerCase() === 'diamond@gmail.com') {
-          userData.role = 'admin';
-          userData.firstName = 'Pelumi';
-          userData.lastName = 'Ariyo';
-        }
-        
+        const userData = res.data.user;
         setCurrentUser(userData);
         setIsAuthenticated(true);
         
@@ -254,48 +233,7 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error:', err);
-      
-      // If backend fails, simulate login for testing
-      if (formData.email.toLowerCase() === 'diamond@gmail.com' && formData.password === 'Olayori25') {
-        // Simulate admin login
-        const simulatedAdmin: User = {
-          _id: 'admin-1',
-          firstName: 'Pelumi',
-          lastName: 'Ariyo',
-          email: 'diamond@gmail.com',
-          department: 'Computer Science',
-          role: 'admin',
-          status: 'active',
-          level: '500',
-          cgpa: '5.0'
-        };
-        
-        localStorage.setItem('token', 'simulated-token-' + Date.now());
-        setCurrentUser(simulatedAdmin);
-        setIsAuthenticated(true);
-        loadAdminData();
-        toast.success('👋 Welcome Admin! (Simulated Login)');
-      } else if (isLogin) {
-        // For other logins, simulate student
-        const simulatedStudent: User = {
-          _id: 'student-' + Date.now(),
-          firstName: 'Test',
-          lastName: 'Student',
-          email: formData.email,
-          department: 'Computer Science',
-          role: 'student',
-          status: 'active',
-          level: '100',
-          cgpa: '0.00'
-        };
-        
-        localStorage.setItem('token', 'simulated-token-' + Date.now());
-        setCurrentUser(simulatedStudent);
-        setIsAuthenticated(true);
-        toast.success('🎉 Welcome! (Simulated Login)');
-      } else {
-        toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please try again.'}`);
-      }
+      toast.error(`❌ ${err.response?.data?.message || 'Error occurred. Please try again.'}`);
     } finally {
       setLoading(false);
     }
