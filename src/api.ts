@@ -7,7 +7,7 @@ let isBackendWaking = false;
 let wakeupToastId: string | number | null = null;
 
 const API = axios.create({
-  baseURL: 'https://userbackend-slns.onrender.com',
+  baseURL: 'https://userbackend-slns.onrender.com/api',
   timeout: 120000, // Increased to 120 seconds for cold starts
   withCredentials: true,
   headers: {
