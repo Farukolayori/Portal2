@@ -394,7 +394,7 @@ const App: React.FC = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem('darkMode', JSON.stringify(newMode));
-    toast.info(newMode ? '🌙 Dark mode enabled' : '☀️ Light mode enabled');
+    toast.info(newMode ? ' Dark mode enabled' : ' Light mode enabled');
   };
 
   const logout = () => {
