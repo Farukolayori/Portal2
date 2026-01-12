@@ -142,7 +142,16 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
-
+.auth-form-container .img{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.auth-form-container img{
+  width: 60x;
+  height: 60px;
+}
 /* Floating Shapes Animation */
 .floating-shapes {
   position: fixed;

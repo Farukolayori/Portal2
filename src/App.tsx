@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import img from './assets/ibadan-city.jpeg';
 import API from './api';
 import './App.css';
 
@@ -436,6 +437,10 @@ const App: React.FC = () => {
 
         <div className="auth-form-wrapper">
           <div className="auth-form-container">
+            <div className="img">
+            <img src={img} alt="ibadan-poly-logo" />
+
+            </div>
             <div className="logo-section">
               <div className="logo pulse">
                 <FaGraduationCap />
